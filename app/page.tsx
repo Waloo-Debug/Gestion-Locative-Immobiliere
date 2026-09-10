@@ -72,26 +72,6 @@ export default function Home() {
     }
   }
 
-  function resetForm() {
-    setStreetNumber('');
-    setStreetName('');
-    setApartmentNumber('');
-    setFloor('');
-    setBuildingNumber('');
-    setCity('');
-    setDepartment('');
-    setBaseRentPrice('');
-    setServiceCharges('');
-    setHasTenant(false);
-    setTenant1FirstName('');
-    setTenant1LastName('');
-    setTenantEmail('');
-    setTenant2FirstName('');
-    setTenant2LastName('');
-    setEntryDate('');
-    setIsModalOpen(false);
-  }
-
   // Sélectionner un bien à modifier depuis la liste popup
   function selectPropertyToEdit(bien: Property) {
     setEditingId(bien.id);
@@ -141,28 +121,6 @@ export default function Home() {
         fetchProperties();
       }
     }
-  }
-
-  // Mettre à jour resetForm pour nettoyer l'editingId
-  function resetForm() {
-    setEditingId(null);
-    setStreetNumber('');
-    setStreetName('');
-    setApartmentNumber('');
-    setFloor('');
-    setBuildingNumber('');
-    setCity('');
-    setDepartment('');
-    setBaseRentPrice('');
-    setServiceCharges('');
-    setHasTenant(false);
-    setTenant1FirstName('');
-    setTenant1LastName('');
-    setTenantEmail('');
-    setTenant2FirstName('');
-    setTenant2LastName('');
-    setEntryDate('');
-    setIsModalOpen(false);
   }
 
   async function handleFormSubmit(e: React.FormEvent) {
