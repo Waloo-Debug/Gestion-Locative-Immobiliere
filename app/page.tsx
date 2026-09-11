@@ -18,6 +18,7 @@ interface Property {
   id: string;
   street_number: string;
   street_name: string;
+  status?: string;
   apartment_number: string;
   floor: string;
   building_number: string;
@@ -49,17 +50,7 @@ export default function Home() {
   const [department, setDepartment] = useState('');
   
   const [propertyType, setPropertyType] = useState<'Appartement' | 'Maison'>('Appartement');
-  const [baseRentPrice, setBaseRentPrice] = useState('');
-  const [serviceCharges, setServiceCharges] = useState('');
 
-  // Formulaire Locataires
-  const [hasTenant, setHasTenant] = useState(false);
-  const [tenant1FirstName, setTenant1FirstName] = useState('');
-  const [tenant1LastName, setTenant1LastName] = useState('');
-  const [tenantEmail, setTenantEmail] = useState('');
-  const [tenant2FirstName, setTenant2FirstName] = useState('');
-  const [tenant2LastName, setTenant2LastName] = useState('');
-  const [entryDate, setEntryDate] = useState('');
 
   useEffect(() => {
     fetchProperties();
@@ -83,29 +74,7 @@ export default function Home() {
     setBuildingNumber(bien.building_number || '');
     setCity(bien.city || '');
     setDepartment(bien.department || '');
-    setBaseRentPrice(bien.base_rent_price.toString());
-    setServiceCharges(bien.service_charges ? bien.service_charges.toString() : '');
     
-    // Charger les informations du locataire s'il existe
-    const activeTenant = bien.rentals && bien.rentals.length > 0 ? bien.rentals[0] : null;
-    if (activeTenant) {
-      setHasTenant(true);
-      setTenant1FirstName(activeTenant.tenant_first_name || '');
-      setTenant1LastName(activeTenant.tenant_last_name || '');
-      setTenantEmail(activeTenant.tenant_email || '');
-      setTenant2FirstName(activeTenant.tenant2_first_name || '');
-      setTenant2LastName(activeTenant.tenant2_last_name || '');
-      setEntryDate(activeTenant.entry_date ? activeTenant.entry_date.split('T')[0] : ''); // Format YYYY-MM-DD pour l'input date
-    } else {
-      setHasTenant(false);
-      setTenant1FirstName('');
-      setTenant1LastName('');
-      setTenantEmail('');
-      setTenant2FirstName('');
-      setTenant2LastName('');
-      setEntryDate('');
-    }
-
     setIsEditSelectOpen(false);
     setIsModalOpen(true);
   }
@@ -123,109 +92,13 @@ export default function Home() {
     }
   }
 
-  async function handleFormSubmit(e: React.FormEvent) {
+
+
+  async function handleAddProperty(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     const propertyData = {
-      street_number: streetNumber,
-      street_name: streetName,
-      apartment_number: propertyType === 'Appartement' ? apartmentNumber : null,
-      floor: propertyType === 'Appartement' ? floor : null,
-      building_number: propertyType === 'Appartement' ? buildingNumber : null,
-      city,
-      department,
-      property_type: propertyType,
-      base_rent_price: parseFloat(baseRentPrice),
-      service_charges: parseFloat(serviceCharges) || 0,
-    };
-
-    if (editingId) {
-      // 1. Mise à jour du bien
-      const { error } = await supabase
-        .from('properties')
-        .update(propertyData)
-        .eq('id', editingId);
-
-      if (error) {
-        alert("Erreur lors de la modification : " + error.message);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Gestion du locataire associé
-      const currentProp = properties.find(p => p.id === editingId);
-      const activeTenant = currentProp?.rentals && currentProp.rentals.length > 0 ? currentProp.rentals[0] : null;
-
-      if (hasTenant) {
-        if (activeTenant) {
-          // Mettre à jour le locataire existant
-          await supabase.from('rentals').update({
-            tenant_first_name: tenant1FirstName,
-            tenant_last_name: tenant1LastName,
-            tenant2_first_name: tenant2FirstName || null,
-            tenant2_last_name: tenant2LastName || null,
-            tenant_email: tenantEmail,
-            entry_date: entryDate
-          }).eq('id', activeTenant.id);
-        } else {
-          // Créer un locataire si le bien est passé de vacant à loué
-          await supabase.from('rentals').insert([{
-            property_id: editingId,
-            tenant_first_name: tenant1FirstName,
-            tenant_last_name: tenant1LastName,
-            tenant2_first_name: tenant2FirstName || null,
-            tenant2_last_name: tenant2LastName || null,
-            tenant_email: tenantEmail,
-            entry_date: entryDate
-          }]);
-        }
-      } else {
-        // Si la case a été décochée, supprimer le bail actif s'il y en avait un
-        if (activeTenant) {
-          await supabase.from('rentals').delete().eq('id', activeTenant.id);
-        }
-      }
-
-    } else {
-      // MODE CRÉATION (ton code existant)
-      const { data: propData, error: propError } = await supabase
-        .from('properties')
-        .insert([propertyData])
-        .select();
-
-      if (propError) {
-        alert("Erreur lors de l'ajout du bien : " + propError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (hasTenant && propData && propData.length > 0) {
-        const newPropertyId = propData[0].id;
-        await supabase.from('rentals').insert([
-          {
-            property_id: newPropertyId,
-            tenant_first_name: tenant1FirstName,
-            tenant_last_name: tenant1LastName,
-            tenant2_first_name: tenant2FirstName || null,
-            tenant2_last_name: tenant2LastName || null,
-            tenant_email: tenantEmail,
-            entry_date: entryDate
-          }
-        ]);
-      }
-    }
-
-    setLoading(false);
-    resetForm();
-    fetchProperties();
-  }
-
-  async function handleAddProperty(e: React.FormEvent) {
-  e.preventDefault();
-  setLoading(true);
-
-  const propertyData = {
     street_number: streetNumber,
     street_name: streetName,
     apartment_number: propertyType === 'Appartement' ? apartmentNumber : null,
@@ -233,61 +106,30 @@ export default function Home() {
     building_number: propertyType === 'Appartement' ? buildingNumber : null,
     city,
     department,
-    property_type: propertyType,
-    base_rent_price: parseFloat(baseRentPrice),
-    service_charges: parseFloat(serviceCharges) || 0,
+    property_type: propertyType
   };
 
-  if (editingId) {
-    // MODE MODIFICATION
-    const { error } = await supabase
-      .from('properties')
-      .update(propertyData)
-      .eq('id', editingId);
+    if (editingId) {
+      // MODE MODIFICATION
+      const { error } = await supabase
+        .from('properties')
+        .update(propertyData)
+        .eq('id', editingId);
 
-    if (error) {
-      alert("Erreur lors de la modification : " + error.message);
-      setLoading(false);
-      return;
-    }
-  } else {
-    // MODE CRÉATION
-    const { data: propData, error: propError } = await supabase
-      .from('properties')
-      .insert([propertyData])
-      .select();
+      if (error) alert("Erreur lors de la modification : " + error.message);
+    } else {
+      // MODE CRÉATION
+      const { error } = await supabase
+        .from('properties')
+        .insert([propertyData]);
 
-    if (propError) {
-      alert("Erreur lors de l'ajout du bien : " + propError.message);
-      setLoading(false);
-      return;
+      if (error) alert("Erreur lors de l'ajout du bien : " + error.message);
     }
 
-    if (hasTenant && propData && propData.length > 0) {
-      const newPropertyId = propData[0].id;
-
-      const { error: rentError } = await supabase.from('rentals').insert([
-        {
-          property_id: newPropertyId,
-          tenant_first_name: tenant1FirstName,
-          tenant_last_name: tenant1LastName,
-          tenant2_first_name: tenant2FirstName || null,
-          tenant2_last_name: tenant2LastName || null,
-          tenant_email: tenantEmail,
-          entry_date: entryDate
-        }
-      ]);
-
-      if (rentError) {
-        alert("Le bien a été créé, mais erreur pour le locataire : " + rentError.message);
-      }
-    }
+    setLoading(false);
+    resetForm();
+    fetchProperties();
   }
-
-  setLoading(false);
-  resetForm();
-  fetchProperties();
-}
   // Fonction pour supprimer un bien
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.preventDefault(); // Empêche d'ouvrir la page de détails du Link
@@ -333,15 +175,6 @@ export default function Home() {
     setBuildingNumber('');
     setCity('');
     setDepartment('');
-    setBaseRentPrice('');
-    setServiceCharges('');
-    setHasTenant(false);
-    setTenant1FirstName('');
-    setTenant1LastName('');
-    setTenantEmail('');
-    setTenant2FirstName('');
-    setTenant2LastName('');
-    setEntryDate('');
     setIsModalOpen(false);
   }
 
@@ -403,15 +236,13 @@ export default function Home() {
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                           {bien.property_type}
                         </span>
-                        {isOccupied ? (
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                            Loué
-                          </span>
-                        ) : (
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">
-                            Vacant
-                          </span>
-                        )}
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          bien.status === 'Loué' ? 'bg-emerald-100 text-emerald-800' :
+                          bien.status === 'Vendu' ? 'bg-blue-100 text-blue-800' :
+                          'bg-slate-200 text-slate-700'
+                        }`}>
+                          {bien.status || 'Vacant'}
+                        </span>
                       </div>
                       
                       <h3 className="font-bold text-lg text-slate-900 mb-0.5">{fullAddress}</h3>
@@ -490,7 +321,7 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Département (ex: 27) *</label>
+                    <label className="block text-sm font-medium text-slate-700">Département (ex: 75000) *</label>
                     <input 
                       type="text" required value={department} onChange={(e) => setDepartment(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
@@ -525,97 +356,10 @@ export default function Home() {
                       </div>
                     </>
                   )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Loyer HC (€) *</label>
-                    <input 
-                      type="number" required value={baseRentPrice} onChange={(e) => setBaseRentPrice(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Charges (€)</label>
-                    <input 
-                      type="number" value={serviceCharges} onChange={(e) => setServiceCharges(e.target.value)}
-                      className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                    />
-                  </div>
                 </div>
               </div>
 
-              {/* Toggle Locataire */}
-              <div className="pt-2">
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={hasTenant}
-                    onChange={(e) => setHasTenant(e.target.checked)}
-                    className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-600"
-                  />
-                  <span className="text-slate-800 font-medium">Ce bien est actuellement loué</span>
-                </label>
-              </div>
-
-              {/* Section Locataire (Conditionnelle) */}
-              {hasTenant && (
-                <div className="space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <h3 className="text-lg font-semibold text-slate-800 border-b pb-2">2. Informations de location</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Prénom locataire 1 *</label>
-                      <input 
-                        type="text" required={hasTenant} value={tenant1FirstName} onChange={(e) => setTenant1FirstName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Nom locataire 1 *</label>
-                      <input 
-                        type="text" required={hasTenant} value={tenant1LastName} onChange={(e) => setTenant1LastName(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Email (pour les quittances) *</label>
-                      <input 
-                        type="email" required={hasTenant} value={tenantEmail} onChange={(e) => setTenantEmail(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Date de début du bail *</label>
-                      <input 
-                        type="date" required={hasTenant} value={entryDate} onChange={(e) => setEntryDate(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 mt-1 text-slate-900" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <p className="text-sm font-medium text-slate-500 mb-2">Locataire 2 (Optionnel)</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-slate-700">Prénom</label>
-                        <input 
-                          type="text" value={tenant2FirstName} onChange={(e) => setTenant2FirstName(e.target.value)}
-                          className="w-full border border-slate-300 rounded-lg p-2 text-slate-900" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-slate-700">Nom</label>
-                        <input 
-                          type="text" value={tenant2LastName} onChange={(e) => setTenant2LastName(e.target.value)}
-                          className="w-full border border-slate-300 rounded-lg p-2 text-slate-900" 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+          
 
               {/* Boutons d'action */}
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
