@@ -10,7 +10,7 @@ function toAmount(value: number | string | null | undefined): number {
 /** Le bail se rédige pour le locataire actif ; à défaut, pour le plus récemment enregistré. */
 function selectCurrentTenant(rentals: Rental[]): Rental | null {
   if (rentals.length === 0) return null;
-  return rentals.find((rental) => rental.is_active) ?? rentals[0];
+  return rentals.find((rental) => rental.is_active !== false) ?? rentals[0];
 }
 
 function computeRent(property: Property): RentBreakdown {

@@ -1,28 +1,23 @@
-import { supabase } from '@/lib/supabase';
-import type { OwnerProfile } from '../types';
+import { fetchOwnerProfile } from "@/lib/owners";
+import type { OwnerProfile } from "../types";
 
 /**
- * Profil du bailleur connecté (table `profiles`).
- * Retourne `null` tant qu'aucun utilisateur n'est authentifié.
+ * Profil du bailleur (table `owner_profiles`, avec secours local / profiles auth).
  */
 export async function getCurrentOwner(): Promise<OwnerProfile | null> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const profile = await fetchOwnerProfile();
+  if (!profile) return null;
 
-  if (authError || !user) return null;
-
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw new Error(`Impossible de charger le profil bailleur : ${error.message}`);
-  }
-
-  return (data as OwnerProfile) ?? null;
+  return {
+    id: profile.id,
+    first_name: profile.first_name ?? null,
+    last_name: profile.last_name ?? null,
+    email: profile.email ?? null,
+    phone: profile.phone ?? null,
+    street_number: profile.street_number ?? null,
+    street_name: profile.street_name ?? null,
+    city: profile.city ?? null,
+    postal_code: profile.postal_code ?? null,
+    address: profile.address ?? null,
+  };
 }

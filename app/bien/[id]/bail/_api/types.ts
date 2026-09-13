@@ -1,10 +1,10 @@
 /**
  * Types du domaine « bail ».
  * Ils décrivent les colonnes Supabase consommées par la page de bail
- * (tables `properties`, `rentals`, `profiles`, `documents`).
+ * (tables `properties`, `rentals`, `owner_profiles` / `profiles`, `documents`).
  */
 
-export type PropertyType = 'Appartement' | 'Maison';
+export type PropertyType = "Appartement" | "Maison";
 
 export interface Rental {
   id: string;
@@ -14,6 +14,10 @@ export interface Rental {
   tenant2_last_name: string | null;
   tenant_email: string | null;
   tenant_phone: string | null;
+  tenant_street_number?: string | null;
+  tenant_street_name?: string | null;
+  tenant_city?: string | null;
+  tenant_postal_code?: string | null;
   entry_date: string;
   is_active?: boolean | null;
 }
@@ -37,9 +41,13 @@ export interface OwnerProfile {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  address: string | null;
-  phone: string | null;
   email: string | null;
+  phone: string | null;
+  street_number?: string | null;
+  street_name?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  address: string | null;
 }
 
 /** Montants mensuels déjà normalisés en nombres, prêts à être affichés. */
@@ -60,7 +68,7 @@ export interface BailReadModel {
   rent: RentBreakdown;
 }
 
-export type DocumentType = 'Bail' | 'Quittance';
+export type DocumentType = "Bail" | "Quittance";
 
 export interface PropertyDocument {
   id: string;
