@@ -159,8 +159,7 @@ export default function Home() {
     setBuildingNumber(bien.building_number || '');
     setCity(bien.city || '');
     setDepartment(bien.department || '');
-    setBaseRentPrice(bien.base_rent_price.toString());
-    setServiceCharges(bien.service_charges ? bien.service_charges.toString() : '');
+    
     
     setIsModalOpen(true);
   }
