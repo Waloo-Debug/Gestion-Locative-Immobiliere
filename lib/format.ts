@@ -58,17 +58,22 @@ export function apartmentDetails(bien: Property) {
   ].filter(Boolean) as string[];
 }
 
-export function monthlyRentTotal(baseRent: number | string, charges?: number | string | null) {
-  return (parseFloat(String(baseRent)) + parseFloat(String(charges || 0))).toFixed(2);
+export function monthlyRentTotal(baseRent: number | null, charges?: number | null) {
+  return ((baseRent ?? 0) + (charges ?? 0)).toFixed(2);
 }
 
 export function applyIrlIncrease(currentRent: number, rate: number) {
   return (currentRent * (1 + rate / 100)).toFixed(2);
 }
 
-export function buildBailFileName(bien: Property, tenant: Rental) {
-  const tenantName = `${tenant.tenant_first_name}_${tenant.tenant_last_name}`.replace(/\s+/g, "");
-  const propertyName = bien.street_name?.replace(/\s+/g, "_") || "Logement";
-  const date = new Date().toISOString().split("T")[0];
+function fileNamePart(value: string | null | undefined, fallback: string) {
+  const slug = (value ?? "").trim().replace(/\s+/g, "_");
+  return slug || fallback;
+}
+
+export function buildBailFileName(bien: Property, tenant: Rental, issuedAt = new Date()) {
+  const propertyName = fileNamePart(bien.street_name, "Logement");
+  const tenantName = fileNamePart(`${tenant.tenant_first_name} ${tenant.tenant_last_name}`, "Locataire");
+  const date = issuedAt.toISOString().split("T")[0];
   return `Bail_${propertyName}_${tenantName}_${date}.pdf`;
 }

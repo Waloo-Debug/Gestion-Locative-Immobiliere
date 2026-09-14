@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAllOwnerCosts } from "@/lib/ownerCosts";
 import { fetchProperties } from "@/lib/properties";
 import { profitabilitySummary } from "@/lib/profitability";
+import { toErrorMessage } from "@/lib/errors";
 import type { Property, PropertyOwnerCosts } from "@/lib/types";
 
 export function useCalculatorOverview() {
@@ -11,14 +12,17 @@ export function useCalculatorOverview() {
   const [costs, setCosts] = useState<PropertyOwnerCosts[]>([]);
   const [missingTable, setMissingTable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([fetchProperties(), fetchAllOwnerCosts()]).then(([nextProperties, costsResult]) => {
-      setProperties(nextProperties);
-      setCosts(costsResult.data);
-      setMissingTable(costsResult.missingTable);
-      setLoading(false);
-    });
+    Promise.all([fetchProperties(), fetchAllOwnerCosts()])
+      .then(([nextProperties, costsResult]) => {
+        setProperties(nextProperties);
+        setCosts(costsResult.data);
+        setMissingTable(costsResult.missingTable);
+      })
+      .catch((err) => setError(toErrorMessage(err, "Impossible de charger le calculateur.")))
+      .finally(() => setLoading(false));
   }, []);
 
   const rows = useMemo(
@@ -33,5 +37,5 @@ export function useCalculatorOverview() {
     [properties, costs],
   );
 
-  return { rows, missingTable, loading };
+  return { rows, missingTable, loading, error };
 }

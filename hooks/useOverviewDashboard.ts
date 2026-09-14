@@ -5,12 +5,14 @@ import { fetchDocuments } from "@/lib/documents";
 import { fetchProperties } from "@/lib/properties";
 import { getActiveTenants } from "@/lib/rentals";
 import { uniqueQuittances } from "@/lib/receipts";
+import { toErrorMessage } from "@/lib/errors";
 import type { DocumentRecord, Property } from "@/lib/types";
 
 export function useOverviewDashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([fetchProperties(), fetchDocuments()])
@@ -18,6 +20,7 @@ export function useOverviewDashboard() {
         setProperties(nextProperties);
         setDocuments(nextDocuments);
       })
+      .catch((err) => setError(toErrorMessage(err, "Impossible de charger le tableau de bord.")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -50,5 +53,5 @@ export function useOverviewDashboard() {
     [documents, properties],
   );
 
-  return { properties, documents, receipts, stats, loading };
+  return { properties, documents, receipts, stats, loading, error };
 }

@@ -122,7 +122,7 @@ export function receiptAmounts(property: Property) {
   };
 }
 
-type GenerateResult = { created: number; skipped: number; eligible: number };
+type GenerateResult = { created: number; skipped: number; failed: number; eligible: number };
 
 const generationLocks = new Map<string, Promise<GenerateResult>>();
 
@@ -142,6 +142,7 @@ async function generateReceiptsForPeriodUnlocked(period: string): Promise<Genera
   const tenants = getActiveTenants(properties).filter(({ rental }) => tenantWasPresentInPeriod(rental, period));
   let created = 0;
   let skipped = 0;
+  let failed = 0;
 
   for (const { rental, property } of tenants) {
     if (receiptAlreadyExists(documents, rental.id, period)) {
@@ -150,7 +151,10 @@ async function generateReceiptsForPeriodUnlocked(period: string): Promise<Genera
     }
     const fileName = buildQuittanceFileName(period, rental.id);
     const { error } = await insertQuittanceDocument(property.id, rental.id, fileName);
-    if (error) continue;
+    if (error) {
+      failed += 1;
+      continue;
+    }
     documents.push({
       id: fileName,
       property_id: property.id,
@@ -161,7 +165,7 @@ async function generateReceiptsForPeriodUnlocked(period: string): Promise<Genera
     created += 1;
   }
 
-  return { created, skipped, eligible: tenants.length };
+  return { created, skipped, failed, eligible: tenants.length };
 }
 
 export async function autoGenerateCurrentMonthReceipts() {

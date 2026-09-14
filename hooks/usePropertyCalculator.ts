@@ -13,6 +13,7 @@ import {
   rentSimulationRange,
   yearlyProjection,
 } from "@/lib/profitability";
+import { toErrorMessage } from "@/lib/errors";
 import type { OwnerCostFormValues, Property } from "@/lib/types";
 
 export function usePropertyCalculator(propertyId?: string) {
@@ -78,16 +79,13 @@ export function usePropertyCalculator(propertyId?: string) {
     setSavingRent(true);
     setMessage(null);
     const nextRent = Math.round(simulatedRent * 100) / 100;
-    const { error } = await updatePropertyRent(
-      propertyId,
-      nextRent,
-      Number(property.service_charges || 0),
-    );
-    setSavingRent(false);
-    if (error) {
-      console.error("Erreur updatePropertyRent:", error);
-      setMessage(`Impossible d'enregistrer le loyer : ${error.message || "erreur inconnue"}`);
+    try {
+      await updatePropertyRent(propertyId, nextRent, Number(property.service_charges || 0));
+    } catch (err) {
+      setMessage(toErrorMessage(err, "Impossible d'enregistrer le loyer."));
       return;
+    } finally {
+      setSavingRent(false);
     }
     setProperty({ ...property, base_rent_price: nextRent });
     setSimulatedRent(nextRent);
