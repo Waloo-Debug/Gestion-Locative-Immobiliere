@@ -7,43 +7,58 @@ export type InviteEmailPayload = {
   inviteUrl: string;
 };
 
+function readSmtpEnv() {
+  return {
+    host: process.env.SMTP_HOST?.trim() || "",
+    port: process.env.SMTP_PORT?.trim() || "465",
+    user: process.env.SMTP_USER?.trim() || "",
+    pass: (process.env.SMTP_PASS || "").replace(/\s+/g, ""),
+    from: process.env.SMTP_FROM?.trim() || "",
+  };
+}
+
+export function missingSmtpEnvKeys() {
+  const env = readSmtpEnv();
+  const missing: string[] = [];
+  if (!env.host) missing.push("SMTP_HOST");
+  if (!env.user) missing.push("SMTP_USER");
+  if (!env.pass) missing.push("SMTP_PASS");
+  return missing;
+}
+
 export function isMailConfigured() {
-  return Boolean(
-    process.env.SMTP_HOST &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS &&
-      (process.env.SMTP_FROM || process.env.SMTP_USER),
-  );
+  return missingSmtpEnvKeys().length === 0;
 }
 
 function createTransport() {
-  const port = Number(process.env.SMTP_PORT || 465);
-  // Gmail affiche souvent le mot de passe d'application avec des espaces.
-  const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
+  const env = readSmtpEnv();
+  const port = Number(env.port || 465);
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: env.host,
     port,
     secure: port === 465,
     auth: {
-      user: process.env.SMTP_USER,
-      pass,
+      user: env.user,
+      pass: env.pass,
     },
   });
 }
 
 export async function sendCoownerInviteEmail(payload: InviteEmailPayload) {
-  if (!isMailConfigured()) {
+  const missing = missingSmtpEnvKeys();
+  if (missing.length > 0) {
     throw new Error(
-      "Envoi d’e-mail non configuré. Renseigne SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS et SMTP_FROM (mêmes réglages que l’e-mail Auth Supabase).",
+      `Envoi d’e-mail non configuré (manque : ${missing.join(", ")}). Redémarre \`next dev\` après avoir renseigné .env.local.`,
     );
   }
 
+  const env = readSmtpEnv();
   // Gmail exige en pratique l'adresse authentifiée comme expéditeur.
-  const from = process.env.SMTP_FROM?.includes("@")
-    ? process.env.SMTP_FROM
-    : process.env.SMTP_FROM
-      ? `${process.env.SMTP_FROM} <${process.env.SMTP_USER}>`
-      : process.env.SMTP_USER!;
+  const from = env.from.includes("@")
+    ? env.from
+    : env.from
+      ? `${env.from} <${env.user}>`
+      : env.user;
   const subject = `${payload.inviterName} vous invite à la co-gestion d’un bien — Locagest`;
 
   const text = [

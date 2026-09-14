@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname, search } = request.nextUrl;
 
-  if (pathname.startsWith("/api/irl")) {
+  if (pathname.startsWith("/api/")) {
     return supabaseResponse;
   }
 

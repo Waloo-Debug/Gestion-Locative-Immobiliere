@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendCoownerInviteEmail, isMailConfigured } from "@/lib/mail";
+import { isMailConfigured, missingSmtpEnvKeys, sendCoownerInviteEmail } from "@/lib/mail";
 import { createClient } from "@/lib/supabase/server";
 
 function displayName(profile: { first_name?: string | null; last_name?: string | null } | null) {
@@ -8,21 +8,40 @@ function displayName(profile: { first_name?: string | null; last_name?: string |
 }
 
 function appOrigin(request: Request) {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  if (configured) return configured;
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "").trim();
+  const looksLocal =
+    !configured ||
+    configured.includes("localhost") ||
+    configured.includes("127.0.0.1");
+
+  // En prod (Vercel), ne jamais renvoyer un lien localhost même si .env est mal réglé.
+  if (configured && !looksLocal) return configured;
+
   const origin = request.headers.get("origin");
-  if (origin) return origin;
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-  const proto = request.headers.get("x-forwarded-proto") || "http";
-  return host ? `${proto}://${host}` : "http://localhost:3000";
+  if (origin && !origin.includes("localhost") && !origin.includes("127.0.0.1")) {
+    return origin.replace(/\/$/, "");
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost || request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") || (looksLocal ? "http" : "https");
+  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+    return `${proto}://${host}`.replace(/\/$/, "");
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
+  }
+
+  return configured || "http://localhost:3000";
 }
 
 export async function POST(request: Request) {
   if (!isMailConfigured()) {
+    const missing = missingSmtpEnvKeys();
     return NextResponse.json(
       {
-        error:
-          "E-mail non configuré. Ajoute les variables SMTP_* (mêmes valeurs que le SMTP Auth dans Supabase).",
+        error: `E-mail non configuré (manque : ${missing.join(", ") || "SMTP_*"}). En local : .env.local + redémarrage. Sur Vercel : Project Settings → Environment Variables (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, NEXT_PUBLIC_APP_URL).`,
       },
       { status: 503 },
     );
