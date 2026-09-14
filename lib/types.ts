@@ -1,5 +1,8 @@
+import type { OwnershipType } from "@/lib/accountType";
+
 export type PropertyType = "Appartement" | "Maison";
 export type PropertyStatus = "Vacant" | "Loué" | "Vendu";
+export type { OwnershipType, OwnerAccountType } from "@/lib/accountType";
 
 export interface Rental {
   id: string;
@@ -20,6 +23,9 @@ export interface Rental {
 
 export interface Property {
   id: string;
+  user_id?: string | null;
+  ownership_type?: OwnershipType | null;
+  siret?: string | null;
   street_number: string;
   street_name: string;
   status?: string;
@@ -34,17 +40,51 @@ export interface Property {
   rentals: Rental[];
 }
 
+export interface PropertyCoowner {
+  property_id: string;
+  user_id: string;
+  created_at?: string;
+  profile?: OwnerProfile | null;
+}
+
+export interface PropertyInvite {
+  id: string;
+  property_id: string;
+  email: string;
+  token: string;
+  status: "pending" | "accepted" | "revoked" | "expired" | string;
+  invited_by: string;
+  created_at?: string;
+  accepted_at?: string | null;
+}
+
+export type DocumentType =
+  | "Bail"
+  | "Quittance"
+  | "Diagnostic"
+  | "EtatDesLieuxEntree"
+  | "EtatDesLieuxSortie"
+  | string;
+
 export interface DocumentRecord {
   id: string;
   property_id: string;
-  rental_id?: string;
+  user_id?: string | null;
+  rental_id?: string | null;
   file_name: string;
-  document_type: "Bail" | "Quittance" | string;
+  document_type: DocumentType;
+  storage_path?: string | null;
+  mime_type?: string | null;
+  file_size?: number | null;
   created_at?: string;
 }
 
 export interface OwnerProfile {
   id: string;
+  /** @deprecated Type is now on the property */
+  account_type?: OwnershipType | null;
+  /** @deprecated SIRET is now on the property when ownership_type=entreprise */
+  siret?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
@@ -53,7 +93,6 @@ export interface OwnerProfile {
   street_name?: string | null;
   city?: string | null;
   postal_code?: string | null;
-  /** Ancien champ libre, conservé en secours. */
   address?: string | null;
   quittance_generation_day?: number | null;
 }
@@ -83,6 +122,8 @@ export interface PropertyFormValues {
   city: string;
   department: string;
   propertyType: PropertyType;
+  ownershipType: OwnershipType;
+  siret: string;
 }
 
 export interface TenantFormValues {
@@ -103,6 +144,7 @@ export interface PropertyOwnerCosts {
   id?: string;
   property_id: string;
   owner_id?: string | null;
+  user_id?: string | null;
   purchase_price: number;
   monthly_loan: number;
   monthly_loan_insurance: number;

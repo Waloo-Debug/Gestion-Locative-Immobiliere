@@ -37,7 +37,7 @@ export function TenantModal({
             <Field label="Nom (Locataire 1)" required value={form.t1LastName} onChange={(v) => onChange("t1LastName", v)} />
             <Field label="Prénom (Locataire 2)" value={form.t2FirstName} onChange={(v) => onChange("t2FirstName", v)} />
             <Field label="Nom (Locataire 2)" value={form.t2LastName} onChange={(v) => onChange("t2LastName", v)} />
-            <Field label="E-mail" type="email" value={form.tEmail} onChange={(v) => onChange("tEmail", v)} />
+            <Field label="E-mail" type="email" required value={form.tEmail} onChange={(v) => onChange("tEmail", v)} />
             <Field label="N° téléphone" type="tel" value={form.tPhone} onChange={(v) => onChange("tPhone", v)} />
             <Field label="N° de rue" value={form.tStreetNumber} onChange={(v) => onChange("tStreetNumber", v)} />
             <Field label="Nom de rue" value={form.tStreetName} onChange={(v) => onChange("tStreetName", v)} />

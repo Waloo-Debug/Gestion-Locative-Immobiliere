@@ -2,24 +2,22 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useOwnerProfile } from "@/components/profile/OwnerProfileProvider";
 import { ReceiptDocument } from "@/components/receipt/ReceiptDocument";
 import { ReceiptToolbar } from "@/components/receipt/ReceiptToolbar";
 import { BackButton } from "@/components/ui/BackButton";
+import { fetchOwnerProfilesForProperty } from "@/lib/coowners";
 import { fetchDocuments } from "@/lib/documents";
-import { fetchOwnerProfile } from "@/lib/owners";
 import { fetchPropertyById } from "@/lib/properties";
 import type { OwnerProfile, Property, Rental } from "@/lib/types";
 
 function QuittanceDocumentView() {
   const searchParams = useSearchParams();
-  const { profile: contextProfile } = useOwnerProfile();
   const propertyId = searchParams.get("propertyId") || "";
   const rentalId = searchParams.get("rentalId") || "";
   const period = searchParams.get("period") || "";
 
   const [bien, setBien] = useState<Property | null>(null);
-  const [owner, setOwner] = useState<OwnerProfile | null>(null);
+  const [owners, setOwners] = useState<OwnerProfile[]>([]);
   const [issuedAt, setIssuedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,13 +27,13 @@ function QuittanceDocumentView() {
       return;
     }
     async function load() {
-      const [property, profile, documents] = await Promise.all([
+      const [property, profiles, documents] = await Promise.all([
         fetchPropertyById(propertyId),
-        fetchOwnerProfile(),
+        fetchOwnerProfilesForProperty(propertyId),
         fetchDocuments(),
       ]);
       setBien(property);
-      setOwner(profile);
+      setOwners(profiles);
       const receipt = documents.find(
         (document) =>
           document.document_type === "Quittance" &&
@@ -69,7 +67,7 @@ function QuittanceDocumentView() {
       <ReceiptDocument
         bien={bien}
         tenant={tenant}
-        owner={owner || contextProfile}
+        owners={owners}
         period={period}
         issuedAt={issuedAt}
       />

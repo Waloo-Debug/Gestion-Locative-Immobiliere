@@ -18,12 +18,12 @@ const emptyForm: PropertyFormValues = {
   city: "",
   department: "",
   propertyType: "Appartement",
+  ownershipType: "personne_morale",
+  siret: "",
 };
 
 export function usePropertiesDashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [isEditSelectOpen, setIsEditSelectOpen] = useState(false);
-  const [isDeleteSelectOpen, setIsDeleteSelectOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -55,13 +55,14 @@ export function usePropertiesDashboard() {
       city: bien.city || "",
       department: bien.department || "",
       propertyType: bien.property_type,
+      ownershipType: bien.ownership_type || "personne_morale",
+      siret: bien.siret || "",
     });
   }
 
   function selectPropertyToEdit(bien: Property) {
     setEditingId(bien.id);
     fillFormFromProperty(bien);
-    setIsEditSelectOpen(false);
     setIsModalOpen(true);
   }
 
@@ -72,7 +73,6 @@ export function usePropertiesDashboard() {
       alert("Erreur lors de la suppression : " + error.message);
       return;
     }
-    setIsDeleteSelectOpen(false);
     await loadProperties();
   }
 
@@ -82,13 +82,20 @@ export function usePropertiesDashboard() {
 
     if (editingId) {
       const { error } = await updateProperty(editingId, form);
-      if (error) alert("Erreur lors de la modification : " + error.message);
+      setLoading(false);
+      if (error) {
+        alert("Erreur lors de la modification : " + error.message);
+        return;
+      }
     } else {
       const { error } = await createProperty(form);
-      if (error) alert("Erreur lors de l'ajout du bien : " + error.message);
+      setLoading(false);
+      if (error) {
+        alert("Erreur lors de l'ajout du bien : " + error.message);
+        return;
+      }
     }
 
-    setLoading(false);
     resetForm();
     await loadProperties();
   }
@@ -107,10 +114,6 @@ export function usePropertiesDashboard() {
 
   return {
     properties,
-    isEditSelectOpen,
-    setIsEditSelectOpen,
-    isDeleteSelectOpen,
-    setIsDeleteSelectOpen,
     isModalOpen,
     editingId,
     loading,

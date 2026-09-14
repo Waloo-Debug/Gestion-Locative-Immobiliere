@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppShell } from "@/components/layout/AppShell";
-import { OwnerProfileProvider } from "@/components/profile/OwnerProfileProvider";
+import { AuthSessionKeeper } from "@/components/auth/AuthSessionKeeper";
+import { AppProviders } from "@/components/layout/AppProviders";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
@@ -18,6 +18,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Locagest",
   description: "Tableau de bord et suivi des locations",
+  applicationName: "Locagest",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: ["/icon.svg"],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 const themeInitScript = `(function(){try{var t=localStorage.getItem("locagest-theme");document.documentElement.classList.toggle("dark",t!=="light");}catch(e){document.documentElement.classList.add("dark");}})();`;
@@ -34,9 +40,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full">
         <ThemeProvider>
-          <OwnerProfileProvider>
-            <AppShell>{children}</AppShell>
-          </OwnerProfileProvider>
+          <AuthSessionKeeper>
+            <AppProviders>{children}</AppProviders>
+          </AuthSessionKeeper>
         </ThemeProvider>
       </body>
     </html>

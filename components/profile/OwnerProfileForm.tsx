@@ -6,64 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useOwnerProfile } from "@/components/profile/OwnerProfileProvider";
 
-const SQL = `create table if not exists public.owner_profiles (
-  id text primary key default 'default' check (id = 'default'),
-  first_name text,
-  last_name text,
-  email text,
-  phone text,
-  street_number text,
-  street_name text,
-  city text,
-  postal_code text,
-  address text,
-  quittance_generation_day integer,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.owner_profiles add column if not exists street_number text;
-alter table public.owner_profiles add column if not exists street_name text;
-alter table public.owner_profiles add column if not exists city text;
-alter table public.owner_profiles add column if not exists postal_code text;
-
-insert into public.owner_profiles (id) values ('default') on conflict (id) do nothing;
-
-alter table public.owner_profiles enable row level security;
-
-create policy "owner_profiles_anon_all"
-  on public.owner_profiles for all to anon
-  using (true) with check (true);
-
-create policy "owner_profiles_authenticated_all"
-  on public.owner_profiles for all to authenticated
-  using (true) with check (true);`;
-
 export function OwnerProfileForm() {
   const profile = useOwnerProfile();
 
   return (
     <form onSubmit={profile.save} className="space-y-4">
-      {profile.missingTable && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Table Supabase manquante</CardTitle>
-            <CardDescription>
-              Le profil est quand même sauvegardé sur cet appareil. Pour le partager et le garder en base, exécute ce
-              SQL dans Supabase (<code className="text-foreground">supabase/owner_profiles.sql</code>).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="overflow-x-auto rounded-lg bg-muted/50 p-3 text-xs whitespace-pre-wrap">{SQL}</pre>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Identité du bailleur</CardTitle>
           <CardDescription>
-            Ces informations apparaissent sur les baux et les quittances (côté propriétaire).
+            Ces informations apparaissent sur les baux et les quittances. Le type personne morale / entreprise se
+            choisit sur chaque bien.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -74,6 +27,7 @@ export function OwnerProfileForm() {
               value={profile.form.lastName}
               onChange={(event) => profile.setField("lastName", event.target.value)}
               autoComplete="family-name"
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -83,6 +37,7 @@ export function OwnerProfileForm() {
               value={profile.form.firstName}
               onChange={(event) => profile.setField("firstName", event.target.value)}
               autoComplete="given-name"
+              required
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -93,6 +48,7 @@ export function OwnerProfileForm() {
               value={profile.form.email}
               onChange={(event) => profile.setField("email", event.target.value)}
               autoComplete="email"
+              required
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -103,6 +59,7 @@ export function OwnerProfileForm() {
               value={profile.form.phone}
               onChange={(event) => profile.setField("phone", event.target.value)}
               autoComplete="tel"
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -112,6 +69,7 @@ export function OwnerProfileForm() {
               value={profile.form.streetNumber}
               onChange={(event) => profile.setField("streetNumber", event.target.value)}
               autoComplete="address-line1"
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -121,6 +79,7 @@ export function OwnerProfileForm() {
               value={profile.form.streetName}
               onChange={(event) => profile.setField("streetName", event.target.value)}
               autoComplete="address-line2"
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -131,6 +90,7 @@ export function OwnerProfileForm() {
               onChange={(event) => profile.setField("postalCode", event.target.value)}
               autoComplete="postal-code"
               inputMode="numeric"
+              required
             />
           </div>
           <div className="space-y-1.5">
@@ -140,6 +100,7 @@ export function OwnerProfileForm() {
               value={profile.form.city}
               onChange={(event) => profile.setField("city", event.target.value)}
               autoComplete="address-level2"
+              required
             />
           </div>
         </CardContent>

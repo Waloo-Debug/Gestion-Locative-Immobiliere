@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   emptyOwnerProfileForm,
+  ensureOwnerProfileFromAuth,
   fetchOwnerProfileState,
   ownerProfileToForm,
   upsertOwnerProfile,
@@ -39,9 +40,17 @@ export function OwnerProfileProvider({ children }: { children: React.ReactNode }
   const [missingTable, setMissingTable] = useState(false);
 
   const reload = useCallback(async () => {
+    const ensured = await ensureOwnerProfileFromAuth();
     const state = await fetchOwnerProfileState();
-    setProfile(state.profile);
-    setForm(ownerProfileToForm(state.profile));
+    const profile = ensured.profile || state.profile;
+    setProfile(profile);
+    const nextForm = ownerProfileToForm(profile);
+    if (!nextForm.email) {
+      const { createClient } = await import("@/lib/supabase/client");
+      const { data } = await createClient().auth.getUser();
+      if (data.user?.email) nextForm.email = data.user.email;
+    }
+    setForm(nextForm);
     setMissingTable(state.missingTable);
   }, []);
 
@@ -57,6 +66,7 @@ export function OwnerProfileProvider({ children }: { children: React.ReactNode }
     event?.preventDefault();
     setSaving(true);
     setMessage(null);
+
     const result = await upsertOwnerProfile(form, {
       quittanceGenerationDay: profile?.quittance_generation_day ?? null,
     });

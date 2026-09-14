@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchDocumentsByProperty } from "@/lib/documents";
-import { applyIrlIncrease } from "@/lib/format";
 import { fetchIrl } from "@/lib/irl";
 import { fetchPropertyById, updatePropertyRent, updatePropertyStatus } from "@/lib/properties";
-import { archiveRentalsForProperty, createRental, getActiveRental, reactivateLatestRentalForProperty, updateRental } from "@/lib/rentals";
-import type { DocumentRecord, IrlData, Property, Rental, TenantFormValues } from "@/lib/types";
+import {
+  archiveRentalsForProperty,
+  createRental,
+  getActiveRental,
+  reactivateLatestRentalForProperty,
+  updateRental,
+} from "@/lib/rentals";
+import type { IrlData, Property, Rental, TenantFormValues } from "@/lib/types";
 
 const emptyTenantForm: TenantFormValues = {
   t1FirstName: "",
@@ -24,7 +28,6 @@ const emptyTenantForm: TenantFormValues = {
 
 export function usePropertyDetail(id?: string) {
   const [bien, setBien] = useState<Property | null>(null);
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
   const [tenantForm, setTenantForm] = useState<TenantFormValues>(emptyTenantForm);
@@ -35,18 +38,11 @@ export function usePropertyDetail(id?: string) {
   const [isLoadingIrl, setIsLoadingIrl] = useState(false);
 
   const tenant: Rental | null = bien ? getActiveRental(bien) : null;
-  const bails = documents.filter((d) => d.document_type === "Bail");
-  const quittances = documents.filter((d) => d.document_type === "Quittance");
 
   async function loadDetails() {
     if (!id) return;
     const propertyData = await fetchPropertyById(id);
-    console.log("Objet bien récupéré de Supabase :", propertyData);
-    const docsData = await fetchDocumentsByProperty(id);
-    if (propertyData) {
-      setBien(propertyData);
-      setDocuments(docsData);
-    }
+    if (propertyData) setBien(propertyData);
     setLoading(false);
   }
 
@@ -118,12 +114,6 @@ export function usePropertyDetail(id?: string) {
     loadIrl();
   }
 
-  function applyIrlToRent() {
-    if (!irlData) return;
-    const currentRent = parseFloat(editRent) || 0;
-    setEditRent(applyIrlIncrease(currentRent, irlData.rate));
-  }
-
   async function handleSaveRent(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
@@ -137,9 +127,17 @@ export function usePropertyDetail(id?: string) {
     if (!id) return;
 
     if (tenant) {
-      await updateRental(tenant.id, id, tenantForm);
+      const { error } = await updateRental(tenant.id, id, tenantForm);
+      if (error) {
+        alert("Impossible d’enregistrer le locataire : " + error.message);
+        return;
+      }
     } else {
-      await createRental(id, tenantForm);
+      const { error } = await createRental(id, tenantForm);
+      if (error) {
+        alert("Impossible d’ajouter le locataire : " + error.message);
+        return;
+      }
       await updatePropertyStatus(id, "Loué");
     }
 
@@ -151,8 +149,6 @@ export function usePropertyDetail(id?: string) {
     bien,
     loading,
     tenant,
-    bails,
-    quittances,
     isTenantModalOpen,
     setIsTenantModalOpen,
     tenantForm,
@@ -168,7 +164,6 @@ export function usePropertyDetail(id?: string) {
     handleStatusChange,
     openTenantModal,
     openRentModal,
-    applyIrlToRent,
     handleSaveRent,
     handleSaveTenant,
   };

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ownershipTypeLabel } from "@/lib/accountType";
 import { apartmentDetails, formatStreetAddress } from "@/lib/format";
 import type { Property } from "@/lib/types";
 
@@ -9,9 +10,12 @@ export function PropertyHeader({ bien, onEditRent }: { bien: Property; onEditRen
   return (
     <header className="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <Badge variant="outline" className="mb-2">
-          {bien.property_type}
-        </Badge>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <Badge variant="outline">{bien.property_type}</Badge>
+          <Badge variant={bien.ownership_type === "entreprise" ? "default" : "secondary"}>
+            {ownershipTypeLabel(bien.ownership_type)}
+          </Badge>
+        </div>
         <h1 className="text-2xl font-semibold tracking-tight">{formatStreetAddress(bien)}</h1>
         {bien.property_type === "Appartement" && extra.length > 0 && (
           <p className="mt-1 text-sm text-muted-foreground">{extra.join(" • ")}</p>
@@ -19,6 +23,9 @@ export function PropertyHeader({ bien, onEditRent }: { bien: Property; onEditRen
         <p className="mt-0.5 text-sm text-muted-foreground">
           {bien.city} ({bien.department})
         </p>
+        {bien.ownership_type === "entreprise" && bien.siret && (
+          <p className="mt-1 text-xs text-muted-foreground">SIRET {bien.siret}</p>
+        )}
       </div>
       <div className="text-left sm:text-right">
         <p className="mb-1 text-sm text-muted-foreground">Loyer mensuel</p>

@@ -32,6 +32,8 @@ export interface Property {
   city: string | null;
   department: string | null;
   property_type: PropertyType;
+  ownership_type?: string | null;
+  siret?: string | null;
   base_rent_price: number | string | null;
   service_charges: number | string | null;
   status?: string | null;
@@ -39,6 +41,8 @@ export interface Property {
 
 export interface OwnerProfile {
   id: string;
+  account_type?: string | null;
+  siret?: string | null;
   first_name: string | null;
   last_name: string | null;
   email: string | null;

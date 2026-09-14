@@ -1,21 +1,28 @@
 import { formatDateFr, formatStreetAddress, formatTenantAddress, monthlyRentTotal } from "@/lib/format";
+import { ownershipTypeLabel } from "@/lib/accountType";
 import { formatOwnerAddress, ownerField, ownerLegalName } from "@/lib/owners";
 import type { OwnerProfile, Property, Rental } from "@/lib/types";
 
 export function LeaseDocument({
   bien,
   tenant,
+  owners,
   owner,
 }: {
   bien: Property;
   tenant: Rental;
-  owner: OwnerProfile | null;
+  owners?: OwnerProfile[];
+  /** @deprecated Prefer owners */
+  owner?: OwnerProfile | null;
 }) {
   const tenantAddress = formatTenantAddress(tenant);
+  const bailleurs = owners?.length ? owners : owner ? [owner] : [];
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-8 sm:p-12 shadow-lg rounded-xl print:shadow-none print:p-0 print:max-w-none text-slate-800 text-sm leading-relaxed space-y-6">
-      <header className="text-center border-b pb-4 mb-6">
+    <div
+      id="lease-document"
+      className="max-w-4xl mx-auto bg-white p-8 sm:p-12 shadow-lg rounded-xl print:shadow-none print:p-0 print:max-w-none text-slate-800 text-sm leading-relaxed space-y-6"
+    >      <header className="text-center border-b pb-4 mb-6">
         <h1 className="text-2xl font-bold uppercase tracking-wide text-slate-900">
           CONTRAT DE LOCATION D&apos;HABITATION
         </h1>
@@ -27,12 +34,27 @@ export function LeaseDocument({
       <section className="space-y-3">
         <h2 className="font-bold border-b text-base text-slate-900 pb-1">I. DÉSIGNATION DES PARTIES</h2>
 
-        <div className="bg-slate-50 p-3 rounded border print:bg-transparent print:border-none">
-          <p className="font-semibold text-slate-900">Le Bailleur / Le Propriétaire :</p>
-          <p>{ownerLegalName(owner)}</p>
-          <p>Demeurant à : {formatOwnerAddress(owner)}</p>
-          <p>Téléphone : {ownerField(owner?.phone)}</p>
-          <p>Email : {ownerField(owner?.email)}</p>
+        <div className="bg-slate-50 p-3 rounded border print:bg-transparent print:border-none space-y-3">
+          <p className="font-semibold text-slate-900">
+            Le{bailleurs.length > 1 ? "s" : ""} Bailleur{bailleurs.length > 1 ? "s" : ""} / Propriétaire
+            {bailleurs.length > 1 ? "s" : ""} :
+          </p>
+          <p className="text-xs text-slate-600">
+            Détention : {ownershipTypeLabel(bien.ownership_type)}
+            {bien.ownership_type === "entreprise" && bien.siret ? ` — SIRET ${bien.siret}` : ""}
+          </p>
+          {bailleurs.length === 0 ? (
+            <p>Non renseigné</p>
+          ) : (
+            bailleurs.map((item) => (
+              <div key={item.id} className="border-t border-slate-200 pt-2 first:border-t-0 first:pt-0">
+                <p>{ownerLegalName(item)}</p>
+                <p>Demeurant à : {formatOwnerAddress(item)}</p>
+                <p>Téléphone : {ownerField(item.phone)}</p>
+                <p>Email : {ownerField(item.email)}</p>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="bg-slate-50 p-3 rounded border print:bg-transparent print:border-none">
@@ -50,6 +72,7 @@ export function LeaseDocument({
           <p>Email : {ownerField(tenant.tenant_email)}</p>
         </div>
       </section>
+
 
       <section className="space-y-2">
         <h2 className="font-bold border-b text-base text-slate-900 pb-1">II. OBJET DU CONTRAT</h2>

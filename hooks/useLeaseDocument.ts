@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useOwnerProfile } from "@/components/profile/OwnerProfileProvider";
+import { fetchOwnerProfilesForProperty } from "@/lib/coowners";
 import { insertBailDocument } from "@/lib/documents";
 import { buildBailFileName } from "@/lib/format";
-import { fetchOwnerProfile } from "@/lib/owners";
 import { fetchPropertyById } from "@/lib/properties";
 import type { OwnerProfile, Property, Rental } from "@/lib/types";
 
 export function useLeaseDocument(id?: string) {
   const { profile: contextProfile } = useOwnerProfile();
   const [bien, setBien] = useState<Property | null>(null);
-  const [owner, setOwner] = useState<OwnerProfile | null>(null);
+  const [owners, setOwners] = useState<OwnerProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   const tenant: Rental | null = bien?.rentals && bien.rentals.length > 0 ? bien.rentals[0] : null;
@@ -21,8 +21,10 @@ export function useLeaseDocument(id?: string) {
 
     async function load() {
       const data = await fetchPropertyById(id!);
-      if (data) setBien(data);
-      setOwner(await fetchOwnerProfile());
+      if (data) {
+        setBien(data);
+        setOwners(await fetchOwnerProfilesForProperty(data.id));
+      }
       setLoading(false);
     }
 
@@ -45,5 +47,7 @@ export function useLeaseDocument(id?: string) {
     window.print();
   }
 
-  return { bien, owner: owner || contextProfile, tenant, loading, handlePrintAndSave };
+  const resolvedOwners = owners.length ? owners : contextProfile ? [contextProfile] : [];
+
+  return { bien, owners: resolvedOwners, owner: resolvedOwners[0] || null, tenant, loading, handlePrintAndSave };
 }

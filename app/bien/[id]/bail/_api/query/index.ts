@@ -1,2 +1,2 @@
 export { getBailReadModel } from './getBailReadModel';
-export { getCurrentOwner } from './getCurrentOwner';
+export { getCurrentOwner, getPropertyOwners } from './getCurrentOwner';

@@ -9,7 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { PropertyFormValues, PropertyType } from "@/lib/types";
+import { OWNERSHIP_TYPE_OPTIONS } from "@/lib/accountType";
+import type { OwnershipType, PropertyFormValues, PropertyType } from "@/lib/types";
 
 export function PropertyFormModal({
   open,
@@ -39,10 +40,36 @@ export function PropertyFormModal({
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
+              <Label htmlFor="ownershipType">Détention</Label>
+              <Select
+                value={form.ownershipType}
+                onValueChange={(value) => {
+                  if (value === "personne_morale" || value === "entreprise") {
+                    onChange("ownershipType", value as OwnershipType);
+                    if (value !== "entreprise") onChange("siret", "");
+                  }
+                }}
+              >
+                <SelectTrigger id="ownershipType" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {OWNERSHIP_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="propertyType">Type de bien</Label>
-              <Select value={form.propertyType} onValueChange={(value) => {
-                if (value === "Appartement" || value === "Maison") onTypeChange(value);
-              }}>
+              <Select
+                value={form.propertyType}
+                onValueChange={(value) => {
+                  if (value === "Appartement" || value === "Maison") onTypeChange(value);
+                }}
+              >
                 <SelectTrigger id="propertyType" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -52,6 +79,14 @@ export function PropertyFormModal({
                 </SelectContent>
               </Select>
             </div>
+            {form.ownershipType === "entreprise" && (
+              <Field
+                label="N° de SIRET *"
+                value={form.siret}
+                onChange={(value) => onChange("siret", value)}
+                required
+              />
+            )}
             <Field label="Nom de rue *" value={form.streetName} onChange={(value) => onChange("streetName", value)} required />
             <Field label="N° de rue" value={form.streetNumber} onChange={(value) => onChange("streetNumber", value)} />
             <Field label="Ville *" value={form.city} onChange={(value) => onChange("city", value)} required />

@@ -27,7 +27,10 @@ function toAppRental(tenant: BailRental): Rental {
 }
 
 function toAppProperty(bail: BailReadModel): Property {
-  const property = bail.property as BailProperty;
+  const property = bail.property as BailProperty & {
+    ownership_type?: string | null;
+    siret?: string | null;
+  };
   return {
     id: property.id,
     street_number: property.street_number || "",
@@ -39,14 +42,18 @@ function toAppProperty(bail: BailReadModel): Property {
     department: property.department || "",
     property_type: property.property_type,
     status: property.status || undefined,
+    ownership_type:
+      property.ownership_type === "entreprise" || property.ownership_type === "personne_morale"
+        ? property.ownership_type
+        : "personne_morale",
+    siret: property.siret ?? null,
     base_rent_price: bail.rent.base,
     service_charges: bail.rent.charges,
     rentals: bail.tenant ? [toAppRental(bail.tenant)] : [],
   };
 }
 
-function toAppOwner(owner: BailOwner | null): OwnerProfile | null {
-  if (!owner) return null;
+function toAppOwner(owner: BailOwner): OwnerProfile {
   return {
     id: owner.id,
     first_name: owner.first_name,
@@ -64,7 +71,17 @@ function toAppOwner(owner: BailOwner | null): OwnerProfile | null {
 export default function BailPage() {
   const params = useParams();
   const id = params.id as string;
-  const { bail, owner, loading, error, saveError, isSaving, printAndSave } = useBail(id);
+  const {
+    bail,
+    owners,
+    loading,
+    error,
+    saveError,
+    isSaving,
+    savedFileName,
+    printBail,
+    downloadBail,
+  } = useBail(id);
 
   if (loading) {
     return <div className="p-8 text-center text-muted-foreground">Chargement du bail...</div>;
@@ -79,7 +96,7 @@ export default function BailPage() {
     return (
       <div className="p-8 text-center text-muted-foreground">
         <p>Ce bien n&apos;a aucun locataire enregistré. Impossible de générer un bail.</p>
-        <BackButton href={`/bien/${id}`} label="Retour au bien" className="mt-4" />
+        <BackButton href="/baux" label="Retour aux baux" className="mt-4" />
       </div>
     );
   }
@@ -89,13 +106,16 @@ export default function BailPage() {
 
   return (
     <main className="p-4 sm:p-8">
-      <LeaseToolbar propertyId={bail.property.id} onPrint={printAndSave} />
+      <LeaseToolbar
+        onPrint={printBail}
+        onDownload={downloadBail}
+        isSaving={isSaving}
+        savedLabel={savedFileName ? `Enregistré : ${savedFileName}` : null}
+      />
       {saveError && (
-        <p className="mx-auto mb-4 max-w-4xl text-sm text-amber-600 print:hidden">
-          {isSaving ? "Enregistrement..." : saveError}
-        </p>
+        <p className="mx-auto mb-4 max-w-4xl text-sm text-amber-600 print:hidden">{saveError}</p>
       )}
-      <LeaseDocument bien={bien} tenant={tenant} owner={toAppOwner(owner)} />
+      <LeaseDocument bien={bien} tenant={tenant} owners={owners.map(toAppOwner)} />
     </main>
   );
 }

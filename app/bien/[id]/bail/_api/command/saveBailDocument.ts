@@ -25,17 +25,37 @@ export function buildBailFileName({ property, tenant, issuedAt = new Date() }: S
 
 /**
  * Trace le bail généré dans la table `documents`.
- * Retourne le nom de fichier enregistré.
+ * Idempotent pour le même nom de fichier / bien / locataire.
  */
 export async function saveBailDocument(input: SaveBailDocumentInput): Promise<string> {
   const fileName = buildBailFileName(input);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Authentification requise pour enregistrer le bail.");
+  }
 
-  const { error } = await supabase.from('documents').insert([
+  const { data: existing } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("property_id", input.property.id)
+    .eq("rental_id", input.tenant.id)
+    .eq("document_type", "Bail")
+    .eq("file_name", fileName)
+    .maybeSingle();
+
+  if (existing) {
+    return fileName;
+  }
+
+  const { error } = await supabase.from("documents").insert([
     {
       property_id: input.property.id,
       rental_id: input.tenant.id,
       file_name: fileName,
-      document_type: 'Bail',
+      document_type: "Bail",
+      user_id: user.id,
     },
   ]);
 

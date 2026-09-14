@@ -10,6 +10,7 @@ import {
   ChevronDown,
   FileText,
   LayoutDashboard,
+  LogOut,
   Receipt,
   Search,
   Users,
@@ -29,11 +30,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAutoGenerateReceipts } from "@/hooks/useAutoGenerateReceipts";
+import { createClient } from "@/lib/supabase/client";
 import { ownerDisplayName, ownerInitials } from "@/lib/owners";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/biens", label: "Biens", icon: Building2 },
   { href: "/locataires", label: "Locataires", icon: Users },
   { href: "/baux", label: "Baux", icon: FileText },
@@ -42,7 +44,7 @@ const navItems = [
 ];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
+  if (href === "/dashboard") return pathname === "/dashboard";
   if (href === "/biens") return pathname.startsWith("/biens") || pathname.startsWith("/bien");
   return pathname.startsWith(href);
 }
@@ -52,11 +54,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { profile } = useOwnerProfile();
   const [navReady, setNavReady] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   useAutoGenerateReceipts();
 
   useEffect(() => {
     setNavReady(true);
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null));
   }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/accueil");
+    router.refresh();
+  }
 
   const displayName = ownerDisplayName(profile);
   const initials = ownerInitials(profile);
@@ -64,12 +77,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar print:hidden md:flex md:flex-col">
-        <div className="flex h-14 items-center gap-2 px-4">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background">
+        <Link href="/accueil" className="flex h-14 items-center gap-2 px-4 hover:bg-sidebar-accent/40">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Building2 className="size-4" />
           </div>
           <span className="text-sm font-semibold tracking-tight">Locagest</span>
-        </div>
+        </Link>
         <Separator />
         <nav className="flex flex-1 flex-col gap-1 p-3">
           <p className="px-2 pb-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
@@ -85,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
                   active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    ? "bg-primary/15 text-foreground shadow-xs ring-1 ring-primary/25"
                     : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
                 )}
               >
@@ -99,8 +112,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-3 border-b border-border px-4 print:hidden md:px-6">
-          <Link href="/" className="flex items-center gap-2 md:hidden">
-            <Building2 className="size-4" />
+          <Link href="/accueil" className="flex items-center gap-2 md:hidden">
+            <Building2 className="size-4 text-primary" />
             <span className="text-sm font-semibold">Locagest</span>
           </Link>
           <div className="relative mx-auto hidden w-full max-w-xl md:block">
@@ -114,18 +127,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <SettingsMenu />
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" />}>
-                <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                <span className="flex size-7 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
                   {initials}
                 </span>
                 <span className="hidden text-sm sm:inline">{displayName}</span>
                 <ChevronDown className="size-4 text-muted-foreground" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuContent align="end" className="min-w-52">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Compte</DropdownMenuLabel>
                 </DropdownMenuGroup>
+                {email && <p className="px-1.5 pb-1 text-xs text-muted-foreground">{email}</p>}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push("/profil")}>Profil</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut />
+                  Déconnexion
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -140,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs",
-                  active ? "bg-muted text-foreground" : "text-muted-foreground",
+                  active ? "bg-primary/15 text-foreground ring-1 ring-primary/25" : "text-muted-foreground",
                 )}
               >
                 <Icon className="size-3.5" />

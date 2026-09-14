@@ -1,8 +1,6 @@
+import { requireUserId, getUserIdOrNull } from "./auth";
 import { supabase } from "./supabase";
 import type { OwnerProfile, OwnerProfileFormValues } from "./types";
-
-export const OWNER_PROFILE_ID = "default";
-const LOCAL_PROFILE_KEY = "locagest-owner-profile";
 
 export const emptyOwnerProfileForm: OwnerProfileFormValues = {
   firstName: "",
@@ -41,6 +39,7 @@ export function ownerProfileToForm(profile: OwnerProfile | null): OwnerProfileFo
 
 export function formToOwnerProfile(
   form: OwnerProfileFormValues,
+  userId: string,
   extras?: Partial<OwnerProfile>,
 ): OwnerProfile {
   const streetNumber = form.streetNumber.trim() || null;
@@ -48,7 +47,7 @@ export function formToOwnerProfile(
   const city = form.city.trim() || null;
   const postalCode = form.postalCode.trim() || null;
   return {
-    id: OWNER_PROFILE_ID,
+    id: userId,
     first_name: form.firstName.trim() || null,
     last_name: form.lastName.trim() || null,
     email: form.email.trim() || null,
@@ -65,6 +64,53 @@ export function formToOwnerProfile(
 export function ownerDisplayName(profile: OwnerProfile | null | undefined) {
   const name = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim();
   return name || "Gestionnaire";
+}
+
+export function isOwnerProfileComplete(profile: OwnerProfile | null | undefined) {
+  if (!profile) return false;
+  return Boolean(
+    profile.first_name?.trim() &&
+      profile.last_name?.trim() &&
+      profile.email?.trim() &&
+      profile.phone?.trim() &&
+      profile.street_number?.trim() &&
+      profile.street_name?.trim() &&
+      profile.postal_code?.trim() &&
+      profile.city?.trim(),
+  );
+}
+
+export function authMetadataFromForm(form: OwnerProfileFormValues) {
+  return {
+    contact_email: form.email.trim(),
+    first_name: form.firstName.trim(),
+    last_name: form.lastName.trim(),
+    phone: form.phone.trim(),
+    street_number: form.streetNumber.trim(),
+    street_name: form.streetName.trim(),
+    postal_code: form.postalCode.trim(),
+    city: form.city.trim(),
+  };
+}
+
+export function formFromAuthMetadata(
+  meta: Record<string, unknown> | null | undefined,
+  email?: string | null,
+): OwnerProfileFormValues {
+  const text = (key: string) => {
+    const value = meta?.[key];
+    return typeof value === "string" ? value : "";
+  };
+  return {
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    email: (text("contact_email") || email || "").trim(),
+    phone: text("phone"),
+    streetNumber: text("street_number"),
+    streetName: text("street_name"),
+    postalCode: text("postal_code"),
+    city: text("city"),
+  };
 }
 
 export function ownerLegalName(profile: OwnerProfile | null | undefined) {
@@ -92,43 +138,12 @@ export function ownerInitials(profile: OwnerProfile | null | undefined) {
   return initials || "GE";
 }
 
-function profileHasIdentity(profile: OwnerProfile | null | undefined) {
-  if (!profile) return false;
-  return Boolean(
-    profile.first_name ||
-      profile.last_name ||
-      profile.email ||
-      profile.phone ||
-      profile.street_name ||
-      profile.city ||
-      profile.address,
-  );
-}
-
-function readLocalProfile(): OwnerProfile | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LOCAL_PROFILE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as OwnerProfile;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalProfile(profile: OwnerProfile) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile));
-  } catch {
-    // ignore
-  }
-}
-
 function normalizeProfile(row: Partial<OwnerProfile> | null | undefined): OwnerProfile | null {
-  if (!row) return null;
+  if (!row?.id) return null;
   return {
-    id: row.id || OWNER_PROFILE_ID,
+    id: row.id,
+    account_type: row.account_type ?? null,
+    siret: row.siret ?? null,
     first_name: row.first_name ?? null,
     last_name: row.last_name ?? null,
     email: row.email ?? null,
@@ -142,22 +157,23 @@ function normalizeProfile(row: Partial<OwnerProfile> | null | undefined): OwnerP
   };
 }
 
-async function fetchAuthProfile(): Promise<OwnerProfile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-  return normalizeProfile(data as OwnerProfile | null);
+export async function fetchOwnerProfile(): Promise<OwnerProfile | null> {
+  const userId = await getUserIdOrNull();
+  if (!userId) return null;
+
+  const { data, error } = await supabase.from("owner_profiles").select("*").eq("id", userId).maybeSingle();
+  if (error || !data) return null;
+  return normalizeProfile(data as OwnerProfile);
 }
 
-async function fetchSingletonProfile(): Promise<{ profile: OwnerProfile | null; missingTable: boolean }> {
-  const { data, error } = await supabase
-    .from("owner_profiles")
-    .select("*")
-    .eq("id", OWNER_PROFILE_ID)
-    .maybeSingle();
+export async function fetchOwnerProfileState(): Promise<{
+  profile: OwnerProfile | null;
+  missingTable: boolean;
+}> {
+  const userId = await getUserIdOrNull();
+  if (!userId) return { profile: null, missingTable: false };
 
+  const { data, error } = await supabase.from("owner_profiles").select("*").eq("id", userId).maybeSingle();
   if (error) {
     const missingTable =
       error.code === "42P01" ||
@@ -166,49 +182,16 @@ async function fetchSingletonProfile(): Promise<{ profile: OwnerProfile | null; 
       error.message?.toLowerCase().includes("could not find");
     return { profile: null, missingTable };
   }
-
   return { profile: normalizeProfile(data as OwnerProfile | null), missingTable: false };
-}
-
-export async function fetchOwnerProfile(): Promise<OwnerProfile | null> {
-  const authProfile = await fetchAuthProfile();
-  if (profileHasIdentity(authProfile)) {
-    writeLocalProfile(authProfile!);
-    return authProfile;
-  }
-
-  const { profile } = await fetchSingletonProfile();
-  if (profile) {
-    writeLocalProfile(profile);
-    return profile;
-  }
-
-  return readLocalProfile() || authProfile;
-}
-
-export async function fetchOwnerProfileState(): Promise<{
-  profile: OwnerProfile | null;
-  missingTable: boolean;
-}> {
-  const authProfile = await fetchAuthProfile();
-  const singleton = await fetchSingletonProfile();
-  const profile =
-    (profileHasIdentity(singleton.profile) ? singleton.profile : null) ||
-    (profileHasIdentity(authProfile) ? authProfile : null) ||
-    singleton.profile ||
-    authProfile ||
-    readLocalProfile();
-
-  if (profile) writeLocalProfile(profile);
-  return { profile, missingTable: singleton.missingTable };
 }
 
 export async function upsertOwnerProfile(
   form: OwnerProfileFormValues,
   options?: { quittanceGenerationDay?: number | null },
 ) {
+  const userId = await requireUserId();
   const current = await fetchOwnerProfile();
-  const next = formToOwnerProfile(form, {
+  const next = formToOwnerProfile(form, userId, {
     quittance_generation_day:
       options?.quittanceGenerationDay ?? current?.quittance_generation_day ?? null,
   });
@@ -216,8 +199,6 @@ export async function upsertOwnerProfile(
     ...next,
     updated_at: new Date().toISOString(),
   };
-
-  writeLocalProfile(next);
 
   const { error } = await supabase.from("owner_profiles").upsert(payload, { onConflict: "id" });
   if (error) {
@@ -229,46 +210,64 @@ export async function upsertOwnerProfile(
     return { data: next, error, missingTable };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    try {
-      await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          email: payload.email,
-          phone: payload.phone,
-          street_number: payload.street_number,
-          street_name: payload.street_name,
-          city: payload.city,
-          postal_code: payload.postal_code,
-          address: payload.address,
-          quittance_generation_day: payload.quittance_generation_day,
-        },
-        { onConflict: "id" },
-      );
-    } catch {
-      // La table profiles auth est optionnelle.
-    }
+  return { data: next, error: null, missingTable: false };
+}
+
+export async function ensureOwnerProfileFromAuth() {
+  const userId = await getUserIdOrNull();
+  if (!userId) return { profile: null as OwnerProfile | null, complete: false };
+
+  const existing = await fetchOwnerProfile();
+  if (isOwnerProfileComplete(existing)) {
+    return { profile: existing, complete: true };
   }
 
-  return { data: next, error: null, missingTable: false };
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData.user;
+  if (!user || user.id !== userId) {
+    return { profile: existing, complete: isOwnerProfileComplete(existing) };
+  }
+
+  const fromMeta = formFromAuthMetadata(
+    user.user_metadata as Record<string, unknown> | undefined,
+    user.email,
+  );
+  const merged: OwnerProfileFormValues = {
+    firstName: existing?.first_name || fromMeta.firstName,
+    lastName: existing?.last_name || fromMeta.lastName,
+    email: existing?.email || fromMeta.email || user.email || "",
+    phone: existing?.phone || fromMeta.phone,
+    streetNumber: existing?.street_number || fromMeta.streetNumber,
+    streetName: existing?.street_name || fromMeta.streetName,
+    city: existing?.city || fromMeta.city,
+    postalCode: existing?.postal_code || fromMeta.postalCode,
+  };
+
+  const hasAny =
+    merged.firstName ||
+    merged.lastName ||
+    merged.phone ||
+    merged.streetNumber ||
+    merged.streetName ||
+    merged.city ||
+    merged.postalCode;
+
+  if (!hasAny && !merged.email) {
+    return { profile: existing, complete: false };
+  }
+
+  const result = await upsertOwnerProfile(merged, {
+    quittanceGenerationDay: existing?.quittance_generation_day ?? null,
+  });
+  if (result.error && !result.missingTable) {
+    return { profile: existing, complete: isOwnerProfileComplete(existing) };
+  }
+  return { profile: result.data, complete: isOwnerProfileComplete(result.data) };
 }
 
 export async function saveQuittanceGenerationDay(day: number) {
   const current = await fetchOwnerProfile();
   const form = ownerProfileToForm(current);
   const result = await upsertOwnerProfile(form, { quittanceGenerationDay: day });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    await supabase.from("profiles").update({ quittance_generation_day: day }).eq("id", user.id);
-  }
-
   return { error: result.error };
 }

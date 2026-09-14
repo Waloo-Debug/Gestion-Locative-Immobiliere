@@ -1,4 +1,5 @@
 import { apartmentDetails, formatCityInfo, formatDateFr, formatEuro, formatStreetAddress, formatTenantAddress, tenantDisplayName } from "@/lib/format";
+import { ownershipTypeLabel } from "@/lib/accountType";
 import { formatOwnerAddress, ownerField, ownerLegalName } from "@/lib/owners";
 import { formatPeriodLabel, receiptAmounts } from "@/lib/receipts";
 import type { OwnerProfile, Property, Rental } from "@/lib/types";
@@ -6,19 +7,26 @@ import type { OwnerProfile, Property, Rental } from "@/lib/types";
 export function ReceiptDocument({
   bien,
   tenant,
+  owners,
   owner,
   period,
   issuedAt,
 }: {
   bien: Property;
   tenant: Rental;
-  owner: OwnerProfile | null;
+  owners?: OwnerProfile[];
+  /** @deprecated Prefer owners */
+  owner?: OwnerProfile | null;
   period: string;
   issuedAt?: string | null;
 }) {
   const amounts = receiptAmounts(bien);
   const extra = apartmentDetails(bien);
-  const ownerName = ownerLegalName(owner) === "Non renseigné" ? "Le bailleur" : ownerLegalName(owner);
+  const bailleurs = owners?.length ? owners : owner ? [owner] : [];
+  const ownerName =
+    bailleurs.length === 0
+      ? "Le bailleur"
+      : bailleurs.map((item) => ownerLegalName(item)).join(", ");
   const periodLabel = formatPeriodLabel(period);
   const tenantAddress = formatTenantAddress(tenant);
 
@@ -30,12 +38,24 @@ export function ReceiptDocument({
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded border bg-slate-50 p-3 print:bg-transparent">
-          <p className="font-semibold text-slate-900">Bailleur</p>
-          <p>{ownerLegalName(owner)}</p>
-          <p>{formatOwnerAddress(owner)}</p>
-          <p>{ownerField(owner?.email)}</p>
-          <p>{ownerField(owner?.phone)}</p>
+        <div className="rounded border bg-slate-50 p-3 print:bg-transparent space-y-2">
+          <p className="font-semibold text-slate-900">Bailleur{bailleurs.length > 1 ? "s" : ""}</p>
+          <p className="text-xs text-slate-600">
+            {ownershipTypeLabel(bien.ownership_type)}
+            {bien.ownership_type === "entreprise" && bien.siret ? ` — SIRET ${bien.siret}` : ""}
+          </p>
+          {bailleurs.length === 0 ? (
+            <p>Non renseigné</p>
+          ) : (
+            bailleurs.map((item) => (
+              <div key={item.id} className="border-t border-slate-200 pt-2 first:border-t-0 first:pt-0">
+                <p>{ownerLegalName(item)}</p>
+                <p>{formatOwnerAddress(item)}</p>
+                <p>{ownerField(item.email)}</p>
+                <p>{ownerField(item.phone)}</p>
+              </div>
+            ))
+          )}
         </div>
         <div className="rounded border bg-slate-50 p-3 print:bg-transparent">
           <p className="font-semibold text-slate-900">Locataire(s)</p>

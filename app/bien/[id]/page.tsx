@@ -1,16 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CurrentRentalCard } from "@/components/property/CurrentRentalCard";
-import { DocumentsSection } from "@/components/property/DocumentsSection";
+import { PropertyDocumentPanel } from "@/components/property/PropertyDocumentPanel";
 import { PropertyHeader } from "@/components/property/PropertyHeader";
 import { RentModal } from "@/components/property/RentModal";
 import { TenantModal } from "@/components/property/TenantModal";
+import { CoownersPanel } from "@/components/coowners/CoownersPanel";
 import { BackButton } from "@/components/ui/BackButton";
-import { buttonVariants } from "@/components/ui/button";
 import { usePropertyDetail } from "@/hooks/usePropertyDetail";
-import { cn } from "@/lib/utils";
 
 export default function BienDetail() {
   const params = useParams();
@@ -25,24 +23,38 @@ export default function BienDetail() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <BackButton href="/biens" label="Retour aux biens" />
-        <Link href={`/calculateur/${id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-          Calculateur
-        </Link>
-      </div>
+    <main className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
+      <BackButton href="/biens" label="Retour aux biens" />
 
       <PropertyHeader bien={detail.bien} onEditRent={detail.openRentModal} />
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,0.9fr)] lg:items-start">
         <CurrentRentalCard
           bien={detail.bien}
           tenant={detail.tenant}
           onStatusChange={detail.handleStatusChange}
           onEditTenant={detail.openTenantModal}
         />
-        <DocumentsSection propertyId={detail.bien.id} bails={detail.bails} quittances={detail.quittances} />
+        <CoownersPanel propertyId={detail.bien.id} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <PropertyDocumentPanel
+          propertyId={detail.bien.id}
+          title="Diagnostics"
+          description="Stocke les diagnostics du bien (DPE, amiante, plomb, électricité…). Tu peux les télécharger à tout moment."
+          categories={[{ label: "Diagnostics", documentType: "Diagnostic" }]}
+        />
+        <PropertyDocumentPanel
+          propertyId={detail.bien.id}
+          title="État des lieux"
+          description="Ajoute l’état des lieux d’entrée ou de sortie, par glisser-déposer ou via Parcourir."
+          rentalId={detail.tenant?.id}
+          categories={[
+            { label: "Entrée", documentType: "EtatDesLieuxEntree" },
+            { label: "Sortie", documentType: "EtatDesLieuxSortie" },
+          ]}
+        />
       </div>
 
       <TenantModal
@@ -62,7 +74,6 @@ export default function BienDetail() {
         editCharges={detail.editCharges}
         onRentChange={detail.setEditRent}
         onChargesChange={detail.setEditCharges}
-        onApplyIrl={detail.applyIrlToRent}
         onSubmit={detail.handleSaveRent}
         onCancel={() => detail.setIsRentModalOpen(false)}
       />
