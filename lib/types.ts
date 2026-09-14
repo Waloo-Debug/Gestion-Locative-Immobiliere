@@ -29,8 +29,9 @@ export interface Property {
   city: string;
   department: string;
   property_type: PropertyType;
-  base_rent_price: number;
-  service_charges: number;
+  /** `null` tant que le loyer n'a pas été saisi : la création d'un bien ne le demande pas. */
+  base_rent_price: number | null;
+  service_charges: number | null;
   rentals: Rental[];
 }
 

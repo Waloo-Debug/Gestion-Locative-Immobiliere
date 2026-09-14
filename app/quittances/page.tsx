@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { ViewLink } from "@/components/ui/ViewLink";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { useReceiptsPage } from "@/hooks/useReceiptsPage";
 import { formatDateFr, formatStreetAddress, tenantDisplayName } from "@/lib/format";
 import { formatPeriodLabel, parseQuittanceFileName, quittanceHref } from "@/lib/receipts";
@@ -30,6 +31,8 @@ export default function QuittancesPage() {
           Génération mensuelle des quittances de loyer pour chaque locataire actif
         </p>
       </div>
+
+      {receiptsPage.error && <ErrorNotice message={receiptsPage.error} />}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { MissingCostsTableCard } from "@/components/calculator/MissingCostsTableCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { useCalculatorOverview } from "@/hooks/useCalculatorOverview";
 import { formatEuro, formatStreetAddress } from "@/lib/format";
 
@@ -18,6 +19,8 @@ export default function CalculateurPage() {
           Dépenses propriétaire, loyer d&apos;équilibre et rentabilité dans le temps
         </p>
       </div>
+
+      {overview.error && <ErrorNotice message={overview.error} />}
 
       {overview.missingTable && <MissingCostsTableCard />}
 

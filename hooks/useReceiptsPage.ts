@@ -13,6 +13,7 @@ import {
   uniqueQuittances,
 } from "@/lib/receipts";
 import { getActiveTenants } from "@/lib/rentals";
+import { toErrorMessage } from "@/lib/errors";
 import type { DocumentRecord, Property } from "@/lib/types";
 
 export function useReceiptsPage() {
@@ -24,6 +25,7 @@ export function useReceiptsPage() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const [nextProperties, nextDocuments, nextOwner] = await Promise.all([
@@ -37,7 +39,9 @@ export function useReceiptsPage() {
   }, []);
 
   useEffect(() => {
-    reload().finally(() => setLoading(false));
+    reload()
+      .catch((err) => setError(toErrorMessage(err, "Impossible de charger les quittances.")))
+      .finally(() => setLoading(false));
   }, [reload]);
 
   const receipts = useMemo(
@@ -57,9 +61,19 @@ export function useReceiptsPage() {
   async function generate(selectedPeriod = period) {
     setGenerating(true);
     setMessage(null);
-    const result = await generateReceiptsForPeriod(selectedPeriod);
-    await reload();
-    setGenerating(false);
+    setError(null);
+
+    let result: Awaited<ReturnType<typeof generateReceiptsForPeriod>>;
+    try {
+      result = await generateReceiptsForPeriod(selectedPeriod);
+      await reload();
+    } catch (err) {
+      setError(toErrorMessage(err, "La génération des quittances a échoué."));
+      return;
+    } finally {
+      setGenerating(false);
+    }
+
     if (result.eligible === 0) {
       setMessage("Aucun locataire actif pour cette période.");
       return;
@@ -69,6 +83,11 @@ export function useReceiptsPage() {
         result.skipped ? `, ${result.skipped} déjà existante${result.skipped > 1 ? "s" : ""}` : ""
       }.`,
     );
+    if (result.failed) {
+      setError(
+        `${result.failed} quittance${result.failed > 1 ? "s" : ""} n'a pas pu être enregistrée. Vérifie les droits sur la table documents.`,
+      );
+    }
   }
 
   return {
@@ -85,5 +104,6 @@ export function useReceiptsPage() {
     message,
     saveDay,
     generate,
+    error,
   };
 }

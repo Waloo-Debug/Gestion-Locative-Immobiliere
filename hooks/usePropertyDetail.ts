@@ -6,6 +6,7 @@ import { applyIrlIncrease } from "@/lib/format";
 import { fetchIrl } from "@/lib/irl";
 import { fetchPropertyById, updatePropertyRent, updatePropertyStatus } from "@/lib/properties";
 import { archiveRentalsForProperty, createRental, getActiveRental, reactivateLatestRentalForProperty, updateRental } from "@/lib/rentals";
+import { toErrorMessage } from "@/lib/errors";
 import type { DocumentRecord, IrlData, Property, Rental, TenantFormValues } from "@/lib/types";
 
 const emptyTenantForm: TenantFormValues = {
@@ -26,6 +27,8 @@ export function usePropertyDetail(id?: string) {
   const [bien, setBien] = useState<Property | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isTenantModalOpen, setIsTenantModalOpen] = useState(false);
   const [tenantForm, setTenantForm] = useState<TenantFormValues>(emptyTenantForm);
   const [isRentModalOpen, setIsRentModalOpen] = useState(false);
@@ -40,14 +43,20 @@ export function usePropertyDetail(id?: string) {
 
   async function loadDetails() {
     if (!id) return;
-    const propertyData = await fetchPropertyById(id);
-    console.log("Objet bien récupéré de Supabase :", propertyData);
-    const docsData = await fetchDocumentsByProperty(id);
-    if (propertyData) {
+    try {
+      const [propertyData, docsData] = await Promise.all([
+        fetchPropertyById(id),
+        fetchDocumentsByProperty(id),
+      ]);
       setBien(propertyData);
       setDocuments(docsData);
+      setError(null);
+    } catch (err) {
+      // Sans cela, un échec de lecture s'afficherait comme « bien introuvable ».
+      setError(toErrorMessage(err, "Impossible de charger le bien."));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -60,18 +69,23 @@ export function usePropertyDetail(id?: string) {
 
   async function handleStatusChange(newStatus: string) {
     if (!id || !bien || newStatus === bien.status) return;
-    await updatePropertyStatus(id, newStatus);
+    setActionError(null);
 
-    if (newStatus === "Vacant" || newStatus === "Vendu") {
-      await archiveRentalsForProperty(id);
-    }
+    try {
+      await updatePropertyStatus(id, newStatus);
 
-    const shouldAddTenant = newStatus === "Loué" && !tenant;
-    if (shouldAddTenant) {
-      const reactivatedId = await reactivateLatestRentalForProperty(id);
-      await loadDetails();
-      if (!reactivatedId) openTenantModal();
-      return;
+      if (newStatus === "Vacant" || newStatus === "Vendu") {
+        await archiveRentalsForProperty(id);
+      }
+
+      if (newStatus === "Loué" && !tenant) {
+        const reactivatedId = await reactivateLatestRentalForProperty(id);
+        await loadDetails();
+        if (!reactivatedId) openTenantModal();
+        return;
+      }
+    } catch (err) {
+      setActionError(toErrorMessage(err, "Le changement de statut a échoué."));
     }
 
     await loadDetails();
@@ -127,8 +141,17 @@ export function usePropertyDetail(id?: string) {
   async function handleSaveRent(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
-    await updatePropertyRent(id, parseFloat(editRent) || 0, parseFloat(editCharges) || 0);
-    setIsRentModalOpen(false);
+    setActionError(null);
+
+    try {
+      await updatePropertyRent(id, parseFloat(editRent) || 0, parseFloat(editCharges) || 0);
+      setIsRentModalOpen(false);
+    } catch (err) {
+      // La modale reste ouverte : la saisie n'est pas perdue.
+      setActionError(toErrorMessage(err, "L'enregistrement du loyer a échoué."));
+      return;
+    }
+
     await loadDetails();
   }
 
@@ -136,11 +159,18 @@ export function usePropertyDetail(id?: string) {
     e.preventDefault();
     if (!id) return;
 
-    if (tenant) {
-      await updateRental(tenant.id, id, tenantForm);
-    } else {
-      await createRental(id, tenantForm);
-      await updatePropertyStatus(id, "Loué");
+    setActionError(null);
+
+    try {
+      if (tenant) {
+        await updateRental(tenant.id, id, tenantForm);
+      } else {
+        await createRental(id, tenantForm);
+        await updatePropertyStatus(id, "Loué");
+      }
+    } catch (err) {
+      setActionError(toErrorMessage(err, "L'enregistrement du locataire a échoué."));
+      return;
     }
 
     setIsTenantModalOpen(false);
@@ -150,6 +180,8 @@ export function usePropertyDetail(id?: string) {
   return {
     bien,
     loading,
+    error,
+    actionError,
     tenant,
     bails,
     quittances,

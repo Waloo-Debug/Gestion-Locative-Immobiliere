@@ -9,6 +9,7 @@ import { RentModal } from "@/components/property/RentModal";
 import { TenantModal } from "@/components/property/TenantModal";
 import { BackButton } from "@/components/ui/BackButton";
 import { buttonVariants } from "@/components/ui/button";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { usePropertyDetail } from "@/hooks/usePropertyDetail";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,13 @@ export default function BienDetail() {
 
   if (detail.loading) {
     return <div className="p-8 text-center text-muted-foreground">Chargement des détails...</div>;
+  }
+  if (detail.error) {
+    return (
+      <div className="mx-auto max-w-5xl p-4 md:p-6">
+        <ErrorNotice message={detail.error} />
+      </div>
+    );
   }
   if (!detail.bien) {
     return <div className="p-8 text-center text-destructive">Bien introuvable.</div>;
@@ -32,6 +40,8 @@ export default function BienDetail() {
           Calculateur
         </Link>
       </div>
+
+      {detail.actionError && <ErrorNotice message={detail.actionError} />}
 
       <PropertyHeader bien={detail.bien} onEditRent={detail.openRentModal} />
 

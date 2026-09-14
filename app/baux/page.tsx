@@ -11,7 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ViewLink } from "@/components/ui/ViewLink";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { fetchDocuments } from "@/lib/documents";
+import { toErrorMessage } from "@/lib/errors";
 import { fetchProperties } from "@/lib/properties";
 import { formatDateFr, formatStreetAddress } from "@/lib/format";
 import type { DocumentRecord, Property } from "@/lib/types";
@@ -19,12 +21,15 @@ import type { DocumentRecord, Property } from "@/lib/types";
 export default function BauxPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([fetchProperties(), fetchDocuments()]).then(([nextProperties, nextDocuments]) => {
-      setProperties(nextProperties);
-      setDocuments(nextDocuments);
-    });
+    Promise.all([fetchProperties(), fetchDocuments()])
+      .then(([nextProperties, nextDocuments]) => {
+        setProperties(nextProperties);
+        setDocuments(nextDocuments);
+      })
+      .catch((err) => setError(toErrorMessage(err, "Impossible de charger les baux.")));
   }, []);
 
   const leases = useMemo(
@@ -44,6 +49,7 @@ export default function BauxPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Baux</h1>
         <p className="text-sm text-muted-foreground">Contrats de location générés</p>
       </div>
+      {error && <ErrorNotice message={error} />}
       <Card>
         <CardHeader>
           <CardTitle>{leases.length} document{leases.length > 1 ? "s" : ""}</CardTitle>

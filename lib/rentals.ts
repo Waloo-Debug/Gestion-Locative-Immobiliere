@@ -1,3 +1,4 @@
+import { assertWritten, unwrapMaybe } from "./errors";
 import { supabase } from "./supabase";
 import type { Property, Rental, TenantFormValues } from "./types";
 
@@ -44,34 +45,55 @@ export function toRentalPayload(propertyId: string, values: TenantFormValues) {
   };
 }
 
-export async function createRental(propertyId: string, values: TenantFormValues) {
-  return supabase.from("rentals").insert([toRentalPayload(propertyId, values)]);
+export async function createRental(propertyId: string, values: TenantFormValues): Promise<void> {
+  assertWritten(
+    await supabase.from("rentals").insert([toRentalPayload(propertyId, values)]),
+    "Impossible d'enregistrer le locataire",
+  );
 }
 
-export async function updateRental(rentalId: string, propertyId: string, values: TenantFormValues) {
-  return supabase.from("rentals").update(toRentalPayload(propertyId, values)).eq("id", rentalId);
+export async function updateRental(
+  rentalId: string,
+  propertyId: string,
+  values: TenantFormValues,
+): Promise<void> {
+  assertWritten(
+    await supabase.from("rentals").update(toRentalPayload(propertyId, values)).eq("id", rentalId),
+    "Impossible de modifier le locataire",
+  );
 }
 
-export async function archiveRental(rentalId: string) {
-  return supabase.from("rentals").update({ is_active: false }).eq("id", rentalId);
+export async function archiveRental(rentalId: string): Promise<void> {
+  assertWritten(
+    await supabase.from("rentals").update({ is_active: false }).eq("id", rentalId),
+    "Impossible d'archiver la location",
+  );
 }
 
-export async function archiveRentalsForProperty(propertyId: string) {
-  return supabase.from("rentals").update({ is_active: false }).eq("property_id", propertyId);
+export async function archiveRentalsForProperty(propertyId: string): Promise<void> {
+  assertWritten(
+    await supabase.from("rentals").update({ is_active: false }).eq("property_id", propertyId),
+    "Impossible d'archiver les locations du bien",
+  );
 }
 
-export async function reactivateLatestRentalForProperty(propertyId: string) {
-  const { data, error } = await supabase
-    .from("rentals")
-    .select("id")
-    .eq("property_id", propertyId)
-    .order("entry_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+export async function reactivateLatestRentalForProperty(propertyId: string): Promise<string | null> {
+  const latest = unwrapMaybe<{ id: string }>(
+    await supabase
+      .from("rentals")
+      .select("id")
+      .eq("property_id", propertyId)
+      .order("entry_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    "Impossible de retrouver la dernière location",
+  );
 
-  if (error || !data) return null;
+  if (!latest) return null;
 
-  const { error: updateError } = await supabase.from("rentals").update({ is_active: true }).eq("id", data.id);
-  if (updateError) return null;
-  return data.id;
+  assertWritten(
+    await supabase.from("rentals").update({ is_active: true }).eq("id", latest.id),
+    "Impossible de réactiver la location",
+  );
+  return latest.id;
 }

@@ -12,6 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
+import { toErrorMessage } from "@/lib/errors";
 import { fetchProperties } from "@/lib/properties";
 import { formatCityInfo, formatDateFr, formatStreetAddress, tenantDisplayName } from "@/lib/format";
 import { getAllTenants } from "@/lib/rentals";
@@ -19,9 +21,12 @@ import type { Property } from "@/lib/types";
 
 export default function LocatairesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProperties().then(setProperties);
+    fetchProperties()
+      .then(setProperties)
+      .catch((err) => setError(toErrorMessage(err, "Impossible de charger les locataires.")));
   }, []);
 
   const tenants = useMemo(
@@ -38,6 +43,7 @@ export default function LocatairesPage() {
           Locataires actifs et historique des anciens occupants
         </p>
       </div>
+      {error && <ErrorNotice message={error} />}
       <Card>
         <CardHeader>
           <CardTitle>

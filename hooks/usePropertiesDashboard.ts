@@ -7,6 +7,7 @@ import {
   fetchProperties,
   updateProperty,
 } from "@/lib/properties";
+import { toErrorMessage } from "@/lib/errors";
 import type { Property, PropertyFormValues, PropertyType } from "@/lib/types";
 
 const emptyForm: PropertyFormValues = {
@@ -27,10 +28,17 @@ export function usePropertiesDashboard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<PropertyFormValues>(emptyForm);
 
   async function loadProperties() {
-    setProperties(await fetchProperties());
+    try {
+      setProperties(await fetchProperties());
+      setError(null);
+    } catch (err) {
+      // Sans cela, un refus RLS ou une panne réseau s'afficherait comme « aucun bien ».
+      setError(toErrorMessage(err, "Impossible de charger les biens."));
+    }
   }
 
   useEffect(() => {
@@ -67,9 +75,10 @@ export function usePropertiesDashboard() {
 
   async function handleDeleteFromList(id: string) {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement ce bien ?")) return;
-    const { error } = await deleteProperty(id);
-    if (error) {
-      alert("Erreur lors de la suppression : " + error.message);
+    try {
+      await deleteProperty(id);
+    } catch (err) {
+      alert(toErrorMessage(err, "La suppression a échoué."));
       return;
     }
     setIsDeleteSelectOpen(false);
@@ -80,16 +89,20 @@ export function usePropertiesDashboard() {
     e.preventDefault();
     setLoading(true);
 
-    if (editingId) {
-      const { error } = await updateProperty(editingId, form);
-      if (error) alert("Erreur lors de la modification : " + error.message);
-    } else {
-      const { error } = await createProperty(form);
-      if (error) alert("Erreur lors de l'ajout du bien : " + error.message);
+    try {
+      if (editingId) {
+        await updateProperty(editingId, form);
+      } else {
+        await createProperty(form);
+      }
+      resetForm();
+    } catch (err) {
+      // Le formulaire reste ouvert pour permettre une correction.
+      alert(toErrorMessage(err, "L'enregistrement du bien a échoué."));
+    } finally {
+      setLoading(false);
     }
 
-    setLoading(false);
-    resetForm();
     await loadProperties();
   }
 
@@ -107,6 +120,7 @@ export function usePropertiesDashboard() {
 
   return {
     properties,
+    error,
     isEditSelectOpen,
     setIsEditSelectOpen,
     isDeleteSelectOpen,

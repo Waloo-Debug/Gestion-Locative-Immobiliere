@@ -12,12 +12,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { useOverviewDashboard } from "@/hooks/useOverviewDashboard";
 import { formatCityInfo, formatDateFr, formatEuro, formatStreetAddress } from "@/lib/format";
 import { formatPeriodLabel, parseQuittanceFileName, quittanceHref } from "@/lib/receipts";
 
 export default function Home() {
-  const { properties, receipts, stats, loading } = useOverviewDashboard();
+  const { properties, receipts, stats, loading, error } = useOverviewDashboard();
 
   return (
     <main className="space-y-6 p-4 md:p-6">
@@ -25,6 +26,8 @@ export default function Home() {
         <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
         <p className="text-sm text-muted-foreground">Vue d&apos;ensemble de votre activité locative</p>
       </div>
+
+      {error && <ErrorNotice message={error} />}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard

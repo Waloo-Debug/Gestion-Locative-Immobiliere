@@ -4,6 +4,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { PropertyCard } from "@/components/dashboard/PropertyCard";
 import { PropertyFormModal } from "@/components/dashboard/PropertyFormModal";
 import { PropertySelectModal } from "@/components/dashboard/PropertySelectModal";
+import { ErrorNotice } from "@/components/ui/ErrorNotice";
 import { usePropertiesDashboard } from "@/hooks/usePropertiesDashboard";
 
 export default function BiensPage() {
@@ -16,6 +17,8 @@ export default function BiensPage() {
         onDelete={() => dashboard.setIsDeleteSelectOpen(true)}
         onAdd={dashboard.openCreateModal}
       />
+
+      {dashboard.error && <ErrorNotice message={dashboard.error} />}
 
       {dashboard.properties.length === 0 ? (
         <p className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground ring-1 ring-foreground/10">
