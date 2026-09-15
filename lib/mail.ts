@@ -44,21 +44,34 @@ function createTransport() {
   });
 }
 
-export async function sendCoownerInviteEmail(payload: InviteEmailPayload) {
-  const missing = missingSmtpEnvKeys();
-  if (missing.length > 0) {
-    throw new Error(
-      `Envoi d’e-mail non configuré (manque : ${missing.join(", ")}). Redémarre \`next dev\` après avoir renseigné .env.local.`,
-    );
-  }
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
 
+function mailFrom() {
   const env = readSmtpEnv();
-  // Gmail exige en pratique l'adresse authentifiée comme expéditeur.
-  const from = env.from.includes("@")
+  return env.from.includes("@")
     ? env.from
     : env.from
       ? `${env.from} <${env.user}>`
       : env.user;
+}
+
+function assertMailReady() {
+  const missing = missingSmtpEnvKeys();
+  if (missing.length > 0) {
+    throw new Error(
+      `Envoi d’e-mail non configuré (manque : ${missing.join(", ")}). Configure SMTP_* (local ou Vercel).`,
+    );
+  }
+}
+
+export async function sendCoownerInviteEmail(payload: InviteEmailPayload) {
+  assertMailReady();
   const subject = `${payload.inviterName} vous invite à la co-gestion d’un bien — Locagest`;
 
   const text = [
@@ -94,9 +107,8 @@ export async function sendCoownerInviteEmail(payload: InviteEmailPayload) {
     <p>— Locagest</p>
   `;
 
-  const transport = createTransport();
-  await transport.sendMail({
-    from,
+  await createTransport().sendMail({
+    from: mailFrom(),
     to: payload.to,
     subject,
     text,
@@ -104,10 +116,136 @@ export async function sendCoownerInviteEmail(payload: InviteEmailPayload) {
   });
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+export type RentReminderEmailPayload = {
+  to: string;
+  propertyLabel: string;
+  tenantName: string;
+  periodLabel: string;
+  amountLabel: string;
+};
+
+/** Rappel aux détenteurs uniquement — jamais au locataire. */
+export async function sendRentReminderEmail(payload: RentReminderEmailPayload) {
+  assertMailReady();
+  const subject = `Rappel : confirmer le loyer — ${payload.propertyLabel}`;
+  const text = [
+    `Bonjour,`,
+    ``,
+    `Le loyer de ${payload.tenantName} pour ${payload.periodLabel} (${payload.amountLabel})`,
+    `sur le bien ${payload.propertyLabel} n’a pas encore été confirmé dans Locagest.`,
+    ``,
+    `Dès réception du virement, ouvre l’onglet Quittances et clique sur « Confirmer le paiement ».`,
+    `La quittance sera alors envoyée au locataire.`,
+    ``,
+    `— Locagest`,
+  ].join("\n");
+
+  const html = `
+    <p>Bonjour,</p>
+    <p>Le loyer de <strong>${escapeHtml(payload.tenantName)}</strong> pour
+    <strong>${escapeHtml(payload.periodLabel)}</strong>
+    (<strong>${escapeHtml(payload.amountLabel)}</strong>)
+    sur le bien <strong>${escapeHtml(payload.propertyLabel)}</strong>
+    n’a pas encore été confirmé dans Locagest.</p>
+    <p>Dès réception du virement, ouvre l’onglet <strong>Quittances</strong> et clique sur
+    <strong>Confirmer le paiement</strong>. La quittance sera alors envoyée au locataire.</p>
+    <p>— Locagest</p>
+  `;
+
+  await createTransport().sendMail({
+    from: mailFrom(),
+    to: payload.to,
+    subject,
+    text,
+    html,
+  });
+}
+
+export type QuittanceEmailPayload = {
+  to: string;
+  tenantName: string;
+  propertyLabel: string;
+  periodLabel: string;
+  amountLabel: string;
+  pdfBytes: Uint8Array;
+  pdfFileName: string;
+};
+
+/** Quittance au locataire uniquement — PDF joint, aucun lien app. */
+export async function sendQuittanceEmail(payload: QuittanceEmailPayload) {
+  assertMailReady();
+  const subject = `Quittance de loyer — ${payload.periodLabel}`;
+  const text = [
+    `Bonjour ${payload.tenantName},`,
+    ``,
+    `Veuillez trouver ci-joint votre quittance de loyer pour ${payload.periodLabel}`,
+    `(${payload.amountLabel}) concernant le logement ${payload.propertyLabel}.`,
+    ``,
+    `— Locagest`,
+  ].join("\n");
+
+  const html = `
+    <p>Bonjour ${escapeHtml(payload.tenantName)},</p>
+    <p>Veuillez trouver <strong>ci-joint</strong> votre quittance de loyer pour
+    <strong>${escapeHtml(payload.periodLabel)}</strong>
+    (<strong>${escapeHtml(payload.amountLabel)}</strong>)
+    concernant le logement <strong>${escapeHtml(payload.propertyLabel)}</strong>.</p>
+    <p>— Locagest</p>
+  `;
+
+  await createTransport().sendMail({
+    from: mailFrom(),
+    to: payload.to,
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        filename: payload.pdfFileName,
+        content: Buffer.from(payload.pdfBytes),
+        contentType: "application/pdf",
+      },
+    ],
+  });
+}
+
+export type QuittanceSentOwnerEmailPayload = {
+  to: string;
+  propertyLabel: string;
+  tenantName: string;
+  periodLabel: string;
+  amountLabel: string;
+  tenantEmail: string;
+};
+
+/** Accusé d’envoi aux détenteurs — jamais au locataire. */
+export async function sendQuittanceSentOwnerEmail(payload: QuittanceSentOwnerEmailPayload) {
+  assertMailReady();
+  const subject = `Quittance envoyée — ${payload.propertyLabel}`;
+  const text = [
+    `Bonjour,`,
+    ``,
+    `La quittance de loyer pour ${payload.tenantName} (${payload.periodLabel}, ${payload.amountLabel})`,
+    `concernant ${payload.propertyLabel} a bien été envoyée par e-mail à ${payload.tenantEmail}.`,
+    ``,
+    `— Locagest`,
+  ].join("\n");
+
+  const html = `
+    <p>Bonjour,</p>
+    <p>La quittance de loyer pour <strong>${escapeHtml(payload.tenantName)}</strong>
+    (<strong>${escapeHtml(payload.periodLabel)}</strong>,
+    <strong>${escapeHtml(payload.amountLabel)}</strong>)
+    concernant <strong>${escapeHtml(payload.propertyLabel)}</strong>
+    a bien été envoyée par e-mail à <strong>${escapeHtml(payload.tenantEmail)}</strong>.</p>
+    <p>— Locagest</p>
+  `;
+
+  await createTransport().sendMail({
+    from: mailFrom(),
+    to: payload.to,
+    subject,
+    text,
+    html,
+  });
 }

@@ -1,109 +1,186 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchDocuments } from "@/lib/documents";
-import { fetchOwnerProfile } from "@/lib/owners";
+import { toErrorMessage } from "@/lib/errors";
+import { notifyNotificationsChanged } from "@/lib/notifications";
 import { fetchProperties } from "@/lib/properties";
 import {
-  currentPeriod,
-  generateReceiptsForPeriod,
-  loadGenerationDay,
-  persistGenerationDay,
-  recentPeriods,
-  uniqueQuittances,
-} from "@/lib/receipts";
-import { getActiveTenants } from "@/lib/rentals";
-import { toErrorMessage } from "@/lib/errors";
-import type { DocumentRecord, Property } from "@/lib/types";
+  confirmRentPaymentRequest,
+  listRentPaymentPeriods,
+  listRentPayments,
+  resendQuittanceRequest,
+  type RentPaymentRow,
+} from "@/lib/rentPayments";
+import { formatCityInfo, formatStreetAddress } from "@/lib/format";
+import { currentPeriod, formatPeriodLabel } from "@/lib/receipts";
+import type { Property } from "@/lib/types";
+
+export const PERIOD_ALL = "all";
+export const PROPERTY_ALL = "all";
+
+export function paymentStatusLabel(row: RentPaymentRow) {
+  if (row.status === "paid" && row.quittance_sent_at) return "Quittance envoyée";
+  if (row.status === "paid") return "Payé";
+  return "En attente";
+}
+
+export function periodFilterLabel(period: string) {
+  if (!period || period === PERIOD_ALL) return "Tout l’historique";
+  return formatPeriodLabel(period);
+}
+
+export function propertyFilterLabel(property: Property) {
+  return `${formatStreetAddress(property)} — ${formatCityInfo(property)}`;
+}
 
 export function useReceiptsPage() {
+  const [period, setPeriod] = useState(PERIOD_ALL);
+  const [propertyId, setPropertyId] = useState(PROPERTY_ALL);
+  const [periods, setPeriods] = useState<string[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [generationDay, setGenerationDay] = useState(5);
-  const [period, setPeriod] = useState(currentPeriod);
+  const [payments, setPayments] = useState<RentPaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [actingId, setActingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
-  const reload = useCallback(async () => {
-    const [nextProperties, nextDocuments, nextOwner] = await Promise.all([
-      fetchProperties(),
-      fetchDocuments(),
-      fetchOwnerProfile(),
-    ]);
-    setProperties(nextProperties);
-    setDocuments(nextDocuments);
-    setGenerationDay(await loadGenerationDay(nextOwner));
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    // À chaque chargement de page : aucun filtre bien, période = mois courant si dispo sinon tout l’historique.
+    setPropertyId(PROPERTY_ALL);
+
+    (async () => {
+      const [nextProperties, nextPeriods] = await Promise.all([
+        fetchProperties(),
+        listRentPaymentPeriods(null),
+      ]);
+      if (cancelled) return;
+      setProperties(nextProperties);
+      setPeriods(nextPeriods);
+      setPeriod(nextPeriods.includes(currentPeriod()) ? currentPeriod() : PERIOD_ALL);
+      setReady(true);
+    })().catch((err) => {
+      if (cancelled) return;
+      setError(toErrorMessage(err, "Impossible de charger les filtres."));
+      setReady(true);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    reload()
-      .catch((err) => setError(toErrorMessage(err, "Impossible de charger les quittances.")))
-      .finally(() => setLoading(false));
-  }, [reload]);
+    if (!ready) return;
 
-  const receipts = useMemo(
-    () => uniqueQuittances(documents),
-    [documents],
-  );
-  const activeTenants = useMemo(() => getActiveTenants(properties), [properties]);
-  const periods = useMemo(() => recentPeriods(), []);
-
-  async function saveDay(day: number) {
-    setSaving(true);
-    setGenerationDay(await persistGenerationDay(day));
-    setSaving(false);
-    setMessage(`Les quittances seront générées chaque mois à partir du ${day}.`);
-  }
-
-  async function generate(selectedPeriod = period) {
-    setGenerating(true);
-    setMessage(null);
+    let cancelled = false;
+    setLoading(true);
     setError(null);
 
-    let result: Awaited<ReturnType<typeof generateReceiptsForPeriod>>;
-    try {
-      result = await generateReceiptsForPeriod(selectedPeriod);
-      await reload();
-    } catch (err) {
-      setError(toErrorMessage(err, "La génération des quittances a échoué."));
-      return;
-    } finally {
-      setGenerating(false);
-    }
+    const selectedPropertyId = propertyId === PROPERTY_ALL ? null : propertyId;
 
-    if (result.eligible === 0) {
-      setMessage("Aucun locataire actif pour cette période.");
-      return;
-    }
-    setMessage(
-      `${result.created} quittance${result.created > 1 ? "s" : ""} générée${result.created > 1 ? "s" : ""}${
-        result.skipped ? `, ${result.skipped} déjà existante${result.skipped > 1 ? "s" : ""}` : ""
-      }.`,
+    (async () => {
+      const nextPeriods = await listRentPaymentPeriods(selectedPropertyId);
+      if (cancelled) return;
+      setPeriods(nextPeriods);
+
+      let nextPeriod = period;
+      if (nextPeriod !== PERIOD_ALL && !nextPeriods.includes(nextPeriod)) {
+        nextPeriod = nextPeriods.includes(currentPeriod()) ? currentPeriod() : PERIOD_ALL;
+        setPeriod(nextPeriod);
+      }
+
+      const rows = await listRentPayments({
+        period: nextPeriod,
+        propertyId: selectedPropertyId,
+      });
+      if (!cancelled) setPayments(rows);
+    })()
+      .catch((err) => {
+        if (!cancelled) setError(toErrorMessage(err, "Impossible de charger les loyers."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, period, propertyId]);
+
+  const reloadAfterAction = useCallback(async () => {
+    const selectedPropertyId = propertyId === PROPERTY_ALL ? null : propertyId;
+    const nextPeriods = await listRentPaymentPeriods(selectedPropertyId);
+    setPeriods(nextPeriods);
+    setPayments(
+      await listRentPayments({
+        period,
+        propertyId: selectedPropertyId,
+      }),
     );
-    if (result.failed) {
-      setError(
-        `${result.failed} quittance${result.failed > 1 ? "s" : ""} n'a pas pu être enregistrée. Vérifie les droits sur la table documents.`,
-      );
+  }, [period, propertyId]);
+
+  const pending = useMemo(() => payments.filter((row) => row.status === "pending"), [payments]);
+  const history = useMemo(() => payments, [payments]);
+  const showPeriodColumn = period === PERIOD_ALL;
+
+  async function confirmPayment(paymentId: string) {
+    setActingId(paymentId);
+    setActionError(null);
+    setMessage(null);
+    try {
+      await confirmRentPaymentRequest(paymentId);
+      await reloadAfterAction();
+      notifyNotificationsChanged();
+      window.setTimeout(() => notifyNotificationsChanged(), 1500);
+      setMessage("Paiement confirmé. Quittance PDF envoyée au locataire.");
+    } catch (err) {
+      setActionError(toErrorMessage(err, "Confirmation impossible."));
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function resendQuittance(paymentId: string) {
+    setActingId(paymentId);
+    setActionError(null);
+    setMessage(null);
+    try {
+      await resendQuittanceRequest(paymentId);
+      await reloadAfterAction();
+      notifyNotificationsChanged();
+      window.setTimeout(() => notifyNotificationsChanged(), 1500);
+      setMessage("Quittance renvoyée au locataire.");
+    } catch (err) {
+      setActionError(toErrorMessage(err, "Renvoi impossible."));
+    } finally {
+      setActingId(null);
     }
   }
 
   return {
-    properties,
-    receipts,
-    activeTenants,
-    periods,
-    generationDay,
     period,
     setPeriod,
+    periods,
+    propertyId,
+    setPropertyId,
+    properties,
+    pending,
+    history,
+    showPeriodColumn,
     loading,
-    saving,
-    generating,
+    actingId,
     message,
-    saveDay,
-    generate,
     error,
+    actionError,
+    confirmPayment,
+    resendQuittance,
+    periodFilterLabel,
+    propertyFilterLabel,
   };
 }

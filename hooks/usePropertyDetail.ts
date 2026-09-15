@@ -24,6 +24,7 @@ const emptyTenantForm: TenantFormValues = {
   tCity: "",
   tPostalCode: "",
   tEntryDate: "",
+  rentDueDay: "5",
 };
 
 export function usePropertyDetail(id?: string) {
@@ -87,6 +88,7 @@ export function usePropertyDetail(id?: string) {
         tCity: tenant.tenant_city || "",
         tPostalCode: tenant.tenant_postal_code || "",
         tEntryDate: tenant.entry_date ? tenant.entry_date.split("T")[0] : "",
+        rentDueDay: String(tenant.rent_due_day && tenant.rent_due_day >= 1 ? tenant.rent_due_day : 5),
       });
     } else {
       setTenantForm(emptyTenantForm);

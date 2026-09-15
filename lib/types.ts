@@ -19,6 +19,8 @@ export interface Rental {
   tenant_postal_code?: string | null;
   entry_date: string;
   is_active?: boolean;
+  /** Jour du mois (1–28) où le loyer est attendu / rappels détenteurs. */
+  rent_due_day?: number | null;
 }
 
 export interface Property {
@@ -96,6 +98,37 @@ export interface OwnerProfile {
   postal_code?: string | null;
   address?: string | null;
   quittance_generation_day?: number | null;
+  /** Canal de rappel paiement : email | in_app | none */
+  reminder_channel?: ReminderChannel | null;
+}
+
+export type ReminderChannel = "email" | "in_app" | "none";
+
+export type RentPaymentStatus = "pending" | "paid";
+
+export interface RentPayment {
+  id: string;
+  property_id: string;
+  rental_id: string;
+  period: string;
+  status: RentPaymentStatus;
+  paid_at?: string | null;
+  paid_by?: string | null;
+  last_reminded_on?: string | null;
+  quittance_document_id?: string | null;
+  quittance_sent_at?: string | null;
+  created_at?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  property_id?: string | null;
+  rent_payment_id?: string | null;
+  title: string;
+  body: string;
+  read_at?: string | null;
+  created_at?: string;
 }
 
 export interface OwnerProfileFormValues {
@@ -139,6 +172,7 @@ export interface TenantFormValues {
   tCity: string;
   tPostalCode: string;
   tEntryDate: string;
+  rentDueDay: string;
 }
 
 export interface PropertyOwnerCosts {

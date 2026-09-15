@@ -50,3 +50,32 @@ export async function insertQuittanceDocument(propertyId: string, rentalId: stri
     },
   ]);
 }
+
+export async function insertQuittanceDocumentReturning(
+  propertyId: string,
+  rentalId: string,
+  fileName: string,
+  extras?: { storage_path?: string | null; mime_type?: string | null; file_size?: number | null },
+) {
+  const userId = await requireUserId();
+  const { data, error } = await supabase
+    .from("documents")
+    .insert([
+      {
+        property_id: propertyId,
+        rental_id: rentalId,
+        file_name: fileName,
+        document_type: "Quittance",
+        user_id: userId,
+        storage_path: extras?.storage_path ?? null,
+        mime_type: extras?.mime_type ?? "application/pdf",
+        file_size: extras?.file_size ?? null,
+      },
+    ])
+    .select("*")
+    .maybeSingle();
+  if (error || !data) {
+    throw new Error(error?.message || "Impossible d’enregistrer la quittance.");
+  }
+  return data as DocumentRecord;
+}

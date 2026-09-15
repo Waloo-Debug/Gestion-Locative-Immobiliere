@@ -14,6 +14,7 @@ import {
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ownershipTypeLabel } from "@/lib/accountType";
 import { formatCityInfo, formatDateFr, formatStreetAddress, tenantDisplayName } from "@/lib/format";
+import { formatNextRentDueDate } from "@/lib/rentPayments";
 import { getActiveRental } from "@/lib/rentals";
 import type { Property } from "@/lib/types";
 
@@ -77,10 +78,13 @@ export function PropertyCard({
           {bien.ownership_type === "entreprise" && bien.siret && (
             <p className="mt-1 text-xs text-muted-foreground">SIRET {bien.siret}</p>
           )}
-          {activeTenant && (
+          {activeTenant && bien.status === "Loué" && (
             <div className="mt-4 rounded-lg bg-muted/40 p-3 text-sm">
               <p className="font-medium">{tenantDisplayName(activeTenant)}</p>
               <p className="text-muted-foreground">Bail débuté le {formatDateFr(activeTenant.entry_date)}</p>
+              <p className="text-muted-foreground">
+                Prochain virement : {formatNextRentDueDate(activeTenant)}
+              </p>
             </div>
           )}
         </CardContent>

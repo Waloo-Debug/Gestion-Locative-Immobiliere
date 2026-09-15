@@ -54,6 +54,10 @@ export function toRentalPayload(propertyId: string, values: TenantFormValues) {
     tenant_postal_code: values.tPostalCode.trim() || null,
     entry_date: values.tEntryDate.trim(),
     is_active: true,
+    rent_due_day: (() => {
+      const day = Number(values.rentDueDay);
+      return day >= 1 && day <= 28 ? day : 5;
+    })(),
   };
 }
 

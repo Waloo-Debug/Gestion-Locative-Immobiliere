@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Bell,
   Building2,
   Calculator,
   ChevronDown,
@@ -15,6 +14,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { SettingsMenu } from "@/components/layout/SettingsMenu";
 import { useOwnerProfile } from "@/components/profile/OwnerProfileProvider";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { useAutoGenerateReceipts } from "@/hooks/useAutoGenerateReceipts";
 import { createClient } from "@/lib/supabase/client";
 import { ownerDisplayName, ownerInitials } from "@/lib/owners";
 import { cn } from "@/lib/utils";
@@ -55,7 +54,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { profile } = useOwnerProfile();
   const [navReady, setNavReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
-  useAutoGenerateReceipts();
 
   useEffect(() => {
     setNavReady(true);
@@ -121,9 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Input className="h-9 bg-muted/40 pl-9" placeholder="Rechercher..." />
           </div>
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="icon" aria-label="Notifications">
-              <Bell />
-            </Button>
+            <NotificationsBell />
             <SettingsMenu />
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" className="gap-2 px-2" />}>

@@ -69,6 +69,7 @@ export function OwnerProfileProvider({ children }: { children: React.ReactNode }
 
     const result = await upsertOwnerProfile(form, {
       quittanceGenerationDay: profile?.quittance_generation_day ?? null,
+      reminderChannel: profile?.reminder_channel ?? "email",
     });
     setSaving(false);
     setMissingTable(result.missingTable);

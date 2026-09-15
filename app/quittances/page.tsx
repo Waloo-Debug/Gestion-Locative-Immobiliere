@@ -16,154 +16,218 @@ import {
 import { ViewLink } from "@/components/ui/ViewLink";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ErrorNotice } from "@/components/ui/ErrorNotice";
-import { useReceiptsPage } from "@/hooks/useReceiptsPage";
+import {
+  PERIOD_ALL,
+  PROPERTY_ALL,
+  paymentStatusLabel,
+  useReceiptsPage,
+} from "@/hooks/useReceiptsPage";
 import { formatDateFr, formatStreetAddress, tenantDisplayName } from "@/lib/format";
-import { formatPeriodLabel, parseQuittanceFileName, quittanceHref } from "@/lib/receipts";
+import { propertyLabelOf, rentDueDayOf } from "@/lib/rentPayments";
+import { formatPeriodLabel, quittanceHref } from "@/lib/receipts";
 
 export default function QuittancesPage() {
-  const receiptsPage = useReceiptsPage();
+  const page = useReceiptsPage();
 
   return (
     <main className="space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Quittances</h1>
-        <p className="text-sm text-muted-foreground">
-          Génération mensuelle des quittances de loyer pour chaque locataire actif
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Quittances</h1>
+          <p className="text-sm text-muted-foreground">
+            Confirmez les loyers reçus : la quittance PDF part alors au locataire.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label>Bien</Label>
+            <Select
+              value={page.propertyId}
+              onValueChange={(value) => value && page.setPropertyId(value)}
+            >
+              <SelectTrigger className="w-72 max-w-[min(100vw-2rem,24rem)]">
+                <SelectValue placeholder="Tous les biens">
+                  {(value) => {
+                    if (!value || value === PROPERTY_ALL) return "Tous les biens";
+                    const selected = page.properties.find((p) => p.id === value);
+                    return selected ? page.propertyFilterLabel(selected) : "Tous les biens";
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PROPERTY_ALL}>Tous les biens</SelectItem>
+                {page.properties.map((property) => (
+                  <SelectItem key={property.id} value={property.id}>
+                    {page.propertyFilterLabel(property)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Période</Label>
+            <Select value={page.period} onValueChange={(value) => value && page.setPeriod(value)}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Choisir une période">
+                  {(value) => page.periodFilterLabel(typeof value === "string" ? value : PERIOD_ALL)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={PERIOD_ALL}>Tout l’historique</SelectItem>
+                {page.periods.map((period) => (
+                  <SelectItem key={period} value={period}>
+                    <span className="capitalize">{formatPeriodLabel(period)}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
-      {receiptsPage.error && <ErrorNotice message={receiptsPage.error} />}
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Jour de génération</CardTitle>
-            <CardDescription>
-              Chaque mois, les quittances sont créées à partir de ce jour. L&apos;envoi automatique par e-mail sera
-              ajouté ensuite.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Jour du mois</Label>
-              <Select
-                value={String(receiptsPage.generationDay)}
-                onValueChange={(value) => {
-                  const day = Number(value);
-                  if (day >= 1 && day <= 28) receiptsPage.saveDay(day);
-                }}
-              >
-                <SelectTrigger className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 28 }, (_, index) => (
-                    <SelectItem key={index + 1} value={String(index + 1)}>
-                      {index + 1}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {receiptsPage.saving ? "Enregistrement..." : `Actuel : le ${receiptsPage.generationDay} de chaque mois`}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Générer une période</CardTitle>
-            <CardDescription>
-              {receiptsPage.activeTenants.length} locataire
-              {receiptsPage.activeTenants.length > 1 ? "s" : ""} actif
-              {receiptsPage.activeTenants.length > 1 ? "s" : ""}. Une quittance par locataire, sans doublon.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label>Période</Label>
-              <Select value={receiptsPage.period} onValueChange={(value) => value && receiptsPage.setPeriod(value)}>
-                <SelectTrigger className="w-48 capitalize">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {receiptsPage.periods.map((period) => (
-                    <SelectItem key={period} value={period}>
-                      <span className="capitalize">{formatPeriodLabel(period)}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={() => receiptsPage.generate()} disabled={receiptsPage.generating}>
-              {receiptsPage.generating ? "Génération..." : "Générer les quittances"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {receiptsPage.message && (
-        <p className="text-sm text-muted-foreground">{receiptsPage.message}</p>
-      )}
+      {page.error && <ErrorNotice message={page.error} />}
+      {page.actionError && <ErrorNotice message={page.actionError} />}
+      {page.message && <p className="text-sm text-muted-foreground">{page.message}</p>}
 
       <Card>
         <CardHeader>
           <CardTitle>
-            {receiptsPage.receipts.length} quittance{receiptsPage.receipts.length > 1 ? "s" : ""}
+            {page.pending.length} loyer{page.pending.length > 1 ? "s" : ""} à confirmer
           </CardTitle>
+          <CardDescription>
+            Les détenteurs reçoivent un rappel à partir du jour de virement de chaque locataire, jusqu’à
+            confirmation.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {receiptsPage.loading ? (
+          {page.loading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Chargement...</p>
-          ) : receiptsPage.receipts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Aucune quittance générée.</p>
+          ) : page.pending.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Aucun loyer en attente pour {page.periodFilterLabel(page.period).toLowerCase()}.
+            </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Locataire</TableHead>
                   <TableHead>Bien</TableHead>
-                  <TableHead>Période</TableHead>
-                  <TableHead>Émise le</TableHead>
+                  {page.showPeriodColumn && <TableHead>Période</TableHead>}
+                  <TableHead>Jour rappel</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {receiptsPage.receipts.map((receipt) => {
-                  const parsed = parseQuittanceFileName(receipt.file_name);
-                  const property = receiptsPage.properties.find((item) => item.id === receipt.property_id) ?? null;
-                  const rental =
-                    property?.rentals.find((item) => item.id === (receipt.rental_id || parsed?.rentalId)) ?? null;
-                  const period = parsed?.period;
-                  return (
-                    <TableRow key={receipt.id}>
-                      <TableCell className="font-medium">
-                        {rental ? tenantDisplayName(rental) : "Locataire"}
-                      </TableCell>
-                      <TableCell>
-                        {property ? (
-                          <Link href={`/bien/${property.id}`} className="hover:underline">
-                            {formatStreetAddress(property)}
-                          </Link>
-                        ) : (
-                          "Bien inconnu"
-                        )}
-                      </TableCell>
+                {page.pending.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">
+                      {row.rental ? tenantDisplayName(row.rental) : "Locataire"}
+                    </TableCell>
+                    <TableCell>
+                      {row.property ? (
+                        <Link href={`/bien/${row.property.id}`} className="hover:underline">
+                          {formatStreetAddress(row.property)}
+                        </Link>
+                      ) : (
+                        "Bien inconnu"
+                      )}
+                    </TableCell>
+                    {page.showPeriodColumn && (
                       <TableCell className="capitalize text-muted-foreground">
-                        {period ? formatPeriodLabel(period) : "—"}
+                        {formatPeriodLabel(row.period)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{formatDateFr(receipt.created_at)}</TableCell>
+                    )}
+                    <TableCell className="text-muted-foreground">Le {rentDueDayOf(row.rental)}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={paymentStatusLabel(row)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        disabled={page.actingId === row.id}
+                        onClick={() => page.confirmPayment(row.id)}
+                      >
+                        {page.actingId === row.id ? "Envoi..." : "Confirmer le paiement"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Historique — {page.periodFilterLabel(page.period)}</CardTitle>
+          <CardDescription>
+            {page.history.length} paiement{page.history.length > 1 ? "s" : ""} suivi
+            {page.history.length > 1 ? "s" : ""}
+            {page.propertyId !== PROPERTY_ALL ? " pour ce bien" : ""}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {page.loading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Chargement...</p>
+          ) : page.history.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Aucun paiement pour ce filtre.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Locataire</TableHead>
+                  <TableHead>Bien</TableHead>
+                  {page.showPeriodColumn && <TableHead>Période</TableHead>}
+                  <TableHead>Confirmé le</TableHead>
+                  <TableHead>Envoyée le</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {page.history.map((row) => {
+                  const canView =
+                    row.property && row.rental && row.status === "paid"
+                      ? quittanceHref(row.property.id, row.rental.id, row.period)
+                      : null;
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">
+                        {row.rental ? tenantDisplayName(row.rental) : "Locataire"}
+                      </TableCell>
                       <TableCell>
-                        <StatusBadge status="Émise" />
+                        {row.property ? propertyLabelOf(row.property) : "Bien inconnu"}
+                      </TableCell>
+                      {page.showPeriodColumn && (
+                        <TableCell className="capitalize text-muted-foreground">
+                          {formatPeriodLabel(row.period)}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-muted-foreground">
+                        {row.paid_at ? formatDateFr(row.paid_at) : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {row.quittance_sent_at ? formatDateFr(row.quittance_sent_at) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={paymentStatusLabel(row)} />
                       </TableCell>
                       <TableCell className="text-right">
-                        {property && rental && period ? (
-                          <ViewLink href={quittanceHref(property.id, rental.id, period)} />
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
+                        <div className="flex justify-end gap-2">
+                          {row.status === "paid" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={page.actingId === row.id}
+                              onClick={() => page.resendQuittance(row.id)}
+                            >
+                              {page.actingId === row.id ? "Envoi..." : "Renvoyer"}
+                            </Button>
+                          )}
+                          {canView ? <ViewLink href={canView} /> : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

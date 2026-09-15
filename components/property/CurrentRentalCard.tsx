@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { propertyStatusStyles } from "@/components/shared/StatusBadge";
 import { formatDateFr, formatTenantAddress } from "@/lib/format";
+import { formatNextRentDueDate, rentDueDayOf } from "@/lib/rentPayments";
 import { cn } from "@/lib/utils";
 import type { Property, Rental } from "@/lib/types";
 
@@ -23,7 +25,7 @@ export function CurrentRentalCard({
     <Card>
       <CardHeader className="gap-3">
         <CardTitle>Location actuelle</CardTitle>
-        <div className="flex rounded-lg bg-muted p-1">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
           {statuses.map((status) => {
             const isActive = bien.status === status || (status === "Vacant" && !bien.status);
             return (
@@ -33,7 +35,9 @@ export function CurrentRentalCard({
                 onClick={() => onStatusChange(status)}
                 className={cn(
                   "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                  isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  isActive
+                    ? propertyStatusStyles[status]
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {status}
@@ -60,6 +64,18 @@ export function CurrentRentalCard({
               <div>
                 <p className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">Entrée le</p>
                 <p>{formatDateFr(tenant.entry_date)}</p>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Jour de virement
+                </p>
+                <p>Le {rentDueDayOf(tenant)} de chaque mois</p>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Prochain virement
+                </p>
+                <p>{formatNextRentDueDate(tenant)}</p>
               </div>
               <div className="col-span-2 space-y-1 border-t border-border pt-3 text-sm text-muted-foreground">
                 <p>{tenant.tenant_email || "Email non renseigné"}</p>

@@ -1,6 +1,6 @@
 import { requireUserId, getUserIdOrNull } from "./auth";
 import { supabase } from "./supabase";
-import type { OwnerProfile, OwnerProfileFormValues } from "./types";
+import type { OwnerProfile, OwnerProfileFormValues, ReminderChannel } from "./types";
 
 export const emptyOwnerProfileForm: OwnerProfileFormValues = {
   firstName: "",
@@ -58,6 +58,7 @@ export function formToOwnerProfile(
     postal_code: postalCode,
     address: composeLegacyAddress({ streetNumber, streetName, postalCode, city }),
     quittance_generation_day: extras?.quittance_generation_day ?? null,
+    reminder_channel: extras?.reminder_channel ?? "email",
   };
 }
 
@@ -154,6 +155,7 @@ function normalizeProfile(row: Partial<OwnerProfile> | null | undefined): OwnerP
     postal_code: row.postal_code ?? null,
     address: row.address ?? null,
     quittance_generation_day: row.quittance_generation_day ?? null,
+    reminder_channel: row.reminder_channel ?? "email",
   };
 }
 
@@ -187,13 +189,17 @@ export async function fetchOwnerProfileState(): Promise<{
 
 export async function upsertOwnerProfile(
   form: OwnerProfileFormValues,
-  options?: { quittanceGenerationDay?: number | null },
+  options?: {
+    quittanceGenerationDay?: number | null;
+    reminderChannel?: ReminderChannel | null;
+  },
 ) {
   const userId = await requireUserId();
   const current = await fetchOwnerProfile();
   const next = formToOwnerProfile(form, userId, {
     quittance_generation_day:
       options?.quittanceGenerationDay ?? current?.quittance_generation_day ?? null,
+    reminder_channel: options?.reminderChannel ?? current?.reminder_channel ?? "email",
   });
   const payload = {
     ...next,
@@ -258,6 +264,7 @@ export async function ensureOwnerProfileFromAuth() {
 
   const result = await upsertOwnerProfile(merged, {
     quittanceGenerationDay: existing?.quittance_generation_day ?? null,
+    reminderChannel: existing?.reminder_channel ?? "email",
   });
   if (result.error && !result.missingTable) {
     return { profile: existing, complete: isOwnerProfileComplete(existing) };
@@ -270,4 +277,12 @@ export async function saveQuittanceGenerationDay(day: number) {
   const form = ownerProfileToForm(current);
   const result = await upsertOwnerProfile(form, { quittanceGenerationDay: day });
   return { error: result.error };
+}
+
+export async function saveReminderChannel(channel: ReminderChannel) {
+  const current = await fetchOwnerProfile();
+  const form = ownerProfileToForm(current);
+  const result = await upsertOwnerProfile(form, { reminderChannel: channel });
+  if (result.error) throw new Error(result.error.message);
+  return result.data;
 }

@@ -51,6 +51,21 @@ export function TenantModal({
             value={form.tEntryDate}
             onChange={(v) => onChange("tEntryDate", v)}
           />
+          <div className="space-y-1.5">
+            <Label htmlFor="rent-due-day">Jour de virement / rappel (1–28)</Label>
+            <Input
+              id="rent-due-day"
+              type="number"
+              min={1}
+              max={28}
+              required
+              value={form.rentDueDay}
+              onChange={(e) => onChange("rentDueDay", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Les détenteurs reçoivent un rappel à partir de ce jour chaque mois, jusqu’à confirmation du paiement.
+            </p>
+          </div>
           <DialogFooter className="mx-0 mb-0 border-t-0 bg-transparent p-0">
             <Button type="button" variant="outline" onClick={onCancel}>
               Annuler
