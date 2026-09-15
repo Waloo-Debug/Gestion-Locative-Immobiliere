@@ -1,17 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, FileText, Trash2, Upload } from "lucide-react";
+import { Download, Eye, FileText, Pencil, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { formatDateFr } from "@/lib/format";
 import {
   deletePropertyFile,
+  downloadPropertyFile,
   formatFileSize,
   getPropertyFileDownloadUrl,
+  getPropertyFilePreviewKind,
   listPropertyFiles,
+  renamePropertyFile,
   uploadPropertyFile,
   type PropertyFileDocumentType,
+  type PropertyFilePreviewKind,
 } from "@/lib/propertyDocuments";
 import type { DocumentRecord } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -19,6 +33,14 @@ import { cn } from "@/lib/utils";
 type Category = {
   label: string;
   documentType: PropertyFileDocumentType;
+};
+
+type PreviewState = {
+  doc: DocumentRecord;
+  kind: PropertyFilePreviewKind;
+  url: string | null;
+  loading: boolean;
+  error: string | null;
 };
 
 export function PropertyDocumentPanel({
@@ -40,6 +62,10 @@ export function PropertyDocumentPanel({
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [renameDoc, setRenameDoc] = useState<DocumentRecord | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
 
@@ -86,10 +112,39 @@ export function PropertyDocumentPanel({
   async function handleDownload(doc: DocumentRecord) {
     if (!doc.storage_path) return;
     try {
-      const url = await getPropertyFileDownloadUrl(doc.storage_path);
-      window.open(url, "_blank", "noopener,noreferrer");
+      await downloadPropertyFile(doc);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Téléchargement impossible.");
+    }
+  }
+
+  async function openPreview(doc: DocumentRecord) {
+    if (!doc.storage_path) return;
+    const kind = getPropertyFilePreviewKind(doc);
+    setPreview({ doc, kind, url: null, loading: true, error: null });
+
+    if (kind === "unsupported") {
+      setPreview({
+        doc,
+        kind,
+        url: null,
+        loading: false,
+        error: "Aperçu indisponible pour ce format. Télécharge le fichier pour l’ouvrir.",
+      });
+      return;
+    }
+
+    try {
+      const url = await getPropertyFileDownloadUrl(doc.storage_path);
+      setPreview({ doc, kind, url, loading: false, error: null });
+    } catch (err) {
+      setPreview({
+        doc,
+        kind,
+        url: null,
+        loading: false,
+        error: err instanceof Error ? err.message : "Impossible d’ouvrir l’aperçu.",
+      });
     }
   }
 
@@ -97,9 +152,35 @@ export function PropertyDocumentPanel({
     if (!window.confirm(`Supprimer « ${doc.file_name} » ?`)) return;
     try {
       await deletePropertyFile(doc);
+      if (preview?.doc.id === doc.id) setPreview(null);
+      if (renameDoc?.id === doc.id) setRenameDoc(null);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Suppression impossible.");
+    }
+  }
+
+  function openRename(doc: DocumentRecord) {
+    setRenameDoc(doc);
+    setRenameValue(doc.file_name);
+    setError(null);
+  }
+
+  async function handleRename(event: React.FormEvent) {
+    event.preventDefault();
+    if (!renameDoc) return;
+    setRenaming(true);
+    try {
+      const updated = await renamePropertyFile(renameDoc, renameValue);
+      setRenameDoc(null);
+      if (preview?.doc.id === updated.id) {
+        setPreview((current) => (current ? { ...current, doc: updated } : current));
+      }
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Renommage impossible.");
+    } finally {
+      setRenaming(false);
     }
   }
 
@@ -193,46 +274,147 @@ export function PropertyDocumentPanel({
           <p className="text-sm text-muted-foreground">Aucun document pour le moment.</p>
         ) : (
           <ul className="space-y-2">
-            {visibleFiles.map((doc) => (
-              <li
-                key={doc.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
-              >
-                <div className="flex min-w-0 items-start gap-2">
-                  <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{doc.file_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(doc.file_size)}
-                      {doc.created_at ? ` · ${formatDateFr(doc.created_at)}` : ""}
-                    </p>
+            {visibleFiles.map((doc) => {
+              const kind = getPropertyFilePreviewKind(doc);
+              return (
+                <li
+                  key={doc.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md text-left hover:bg-muted/40"
+                    onClick={() => void openPreview(doc)}
+                  >
+                    <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium underline-offset-2 hover:underline">{doc.file_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(doc.file_size)}
+                        {doc.created_at ? ` · ${formatDateFr(doc.created_at)}` : ""}
+                        {kind === "unsupported" ? " · aperçu limité" : ""}
+                      </p>
+                    </div>
+                  </button>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Voir"
+                      onClick={() => void openPreview(doc)}
+                    >
+                      <Eye />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Renommer"
+                      onClick={() => openRename(doc)}
+                    >
+                      <Pencil />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Télécharger"
+                      onClick={() => handleDownload(doc)}
+                    >
+                      <Download />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Supprimer"
+                      onClick={() => handleDelete(doc)}
+                    >
+                      <Trash2 />
+                    </Button>
                   </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Télécharger"
-                    onClick={() => handleDownload(doc)}
-                  >
-                    <Download />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Supprimer"
-                    onClick={() => handleDelete(doc)}
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
+
+      <Dialog open={Boolean(preview)} onOpenChange={(open) => !open && setPreview(null)}>
+        <DialogContent className="sm:max-w-4xl" showCloseButton>
+          <DialogHeader>
+            <DialogTitle className="truncate">{preview?.doc.file_name || "Aperçu"}</DialogTitle>
+            <DialogDescription>Visualisation dans Locagest — sans téléchargement obligatoire.</DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-64 rounded-lg border border-border bg-muted/20 p-2">
+            {preview?.loading && (
+              <p className="p-8 text-center text-sm text-muted-foreground">Chargement de l’aperçu...</p>
+            )}
+            {!preview?.loading && preview?.error && (
+              <p className="p-8 text-center text-sm text-muted-foreground">{preview.error}</p>
+            )}
+            {!preview?.loading && !preview?.error && preview?.url && preview.kind === "image" && (
+              // eslint-disable-next-line @next/next/no-img-element -- URL signée Supabase temporaire
+              <img
+                src={preview.url}
+                alt={preview.doc.file_name}
+                className="mx-auto max-h-[70vh] w-auto max-w-full object-contain"
+              />
+            )}
+            {!preview?.loading && !preview?.error && preview?.url && preview.kind === "pdf" && (
+              <iframe
+                title={preview.doc.file_name}
+                src={preview.url}
+                className="h-[70vh] w-full rounded-md bg-background"
+              />
+            )}
+          </div>
+
+          <DialogFooter className="mx-0 mb-0 border-t-0 bg-transparent p-0">
+            <Button type="button" variant="outline" onClick={() => setPreview(null)}>
+              Fermer
+            </Button>
+            {preview?.doc && (
+              <Button type="button" onClick={() => void handleDownload(preview.doc)}>
+                Télécharger
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(renameDoc)} onOpenChange={(open) => !open && setRenameDoc(null)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Renommer le document</DialogTitle>
+            <DialogDescription>
+              L’extension est conservée automatiquement si tu ne la saisis pas.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRename} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rename-file">Nouveau nom</Label>
+              <Input
+                id="rename-file"
+                value={renameValue}
+                onChange={(event) => setRenameValue(event.target.value)}
+                required
+                autoFocus
+              />
+            </div>
+            <DialogFooter className="mx-0 mb-0 border-t-0 bg-transparent p-0">
+              <Button type="button" variant="outline" onClick={() => setRenameDoc(null)} disabled={renaming}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={renaming || !renameValue.trim()}>
+                {renaming ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

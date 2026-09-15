@@ -14,6 +14,22 @@ alter table public.documents
 comment on column public.documents.storage_path is
   'Chemin dans le bucket property-files (null pour Bail/Quittance générés).';
 
+-- Types de documents uploadés (en plus de Bail / Quittance)
+alter table public.documents
+  drop constraint if exists documents_document_type_check;
+
+alter table public.documents
+  add constraint documents_document_type_check
+  check (
+    document_type in (
+      'Bail',
+      'Quittance',
+      'Diagnostic',
+      'EtatDesLieuxEntree',
+      'EtatDesLieuxSortie'
+    )
+  );
+
 -- Bucket privé
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
